@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Entitlements Console</title>
+
+<!-- Fonts: JetBrains Mono for technical character, Fraunces for distinctive display, Inter alternative avoided -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<!-- ag-grid via CDN -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.2.2/styles/ag-grid.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.2.2/styles/ag-theme-quartz.css" />
+<script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.2.2/dist/ag-grid-community.min.js"></script>
+
+<style>
+  :root {
+    --font-display: 'Fraunces', serif;
+    --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+    /* Light theme */
+    --bg: #f6f5f1;
+    --bg-elev: #ffffff;
+    --bg-sunken: #ecebe5;
+    --border: #d9d6cc;
+    --border-strong: #b8b3a4;
+    --text: #1a1916;
+    --text-dim: #6b6759;
+    --text-faint: #9c978a;
+    --accent: #b94a1f;
+    --accent-soft: #f3e0d6;
+    --allow: #2f6e3a;
+    --allow-bg: #e2efde;
+    --deny: #b22a2a;
+    --deny-bg: #f5dcd9;
+    --shadow: 0 1px 2px rgba(20,18,12,0.04), 0 4px 16px rgba(20,18,12,0.04);
+  }
+
+  [data-theme="dark"] {
+    --bg: #14130f;
+    --bg-elev: #1c1b17;
+    --bg-sunken: #0e0d0b;
+    --border: #2c2a25;
+    --border-strong: #3f3c35;
+    --text: #ecebe4;
+    --text-dim: #9a958a;
+    --text-faint: #65615a;
+    --accent: #e87a4f;
+    --accent-soft: #3a221a;
+    --allow: #6dbe7c;
+    --allow-bg: #1e2e22;
+    --deny: #e57373;
+    --deny-bg: #2e1c1c;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.25);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    transition: background 0.2s ease, color 0.2s ease;
+    /* subtle paper grain */
+    background-image:
+      radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--accent) 4%, transparent), transparent 50%),
+      radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--accent) 3%, transparent), transparent 40%);
+  }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* Domain dropdown */
+  .domain-select-wrap {
+    position: relative;
+    display: inline-block;
+  }
+  .domain-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 8px 32px 8px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    outline: none;
+    min-width: 200px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .domain-select:hover { border-color: var(--border-strong); }
+  .domain-select:focus { border-color: var(--accent); background: var(--bg-elev); }
+  .domain-select-wrap::after {
+    content: '▾';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-faint);
+    font-size: 10px;
+    pointer-events: none;
+  }
+
+  .theme-toggle {
+    background: var(--bg-sunken);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .theme-toggle:hover {
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
+
+  /* Main */
+  .main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .topbar {
+    padding: 22px 36px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .crumbs {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+  .crumbs .sep { margin: 0 8px; opacity: 0.5; }
+  .crumbs .current { color: var(--accent); }
+
+  .title-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .page-title {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 32px;
+    letter-spacing: -0.02em;
+    margin: 0;
+    line-height: 1.1;
+  }
+  .page-title em { font-style: italic; color: var(--accent); font-weight: 400; }
+
+  .stats {
+    display: flex;
+    gap: 28px;
+  }
+  .stat {
+    text-align: right;
+  }
+  .stat-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--text-faint);
+  }
+  .stat-value {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 1;
+    margin-top: 4px;
+  }
+  .stat-value.allow { color: var(--allow); }
+  .stat-value.deny { color: var(--deny); }
+
+  /* Toolbar */
+  .toolbar {
+    padding: 14px 36px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-elev);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .search-wrap {
+    flex: 1;
+    position: relative;
+    max-width: 480px;
+  }
+  .search-wrap::before {
+    content: '⌕';
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-faint);
+    font-size: 16px;
+  }
+  .search {
+    width: 100%;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 9px 12px 9px 34px;
+    border-radius: 7px;
+    font-family: var(--font-body);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .search:focus {
+    border-color: var(--accent);
+    background: var(--bg-elev);
+  }
+  .search::placeholder { color: var(--text-faint); }
+
+  .filter-group {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .filter-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--text-faint);
+    margin-right: 4px;
+  }
+  .chip {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .chip:hover { color: var(--text); border-color: var(--border-strong); }
+  .chip.active[data-effect="ALLOW"] {
+    background: var(--allow-bg);
+    border-color: var(--allow);
+    color: var(--allow);
+  }
+  .chip.active[data-effect="DENY"] {
+    background: var(--deny-bg);
+    border-color: var(--deny);
+    color: var(--deny);
+  }
+  .chip.active[data-effect="ALL"] {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Grid container */
+  .grid-wrap {
+    flex: 1;
+    min-height: 0;
+    padding: 20px 36px 28px;
+    overflow: hidden;
+    position: relative;
+  }
+  .grid-shell {
+    height: 100%;
+    width: 100%;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .empty-state {
+    position: absolute;
+    inset: 20px 36px 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-elev);
+    border: 1px dashed var(--border-strong);
+    border-radius: 10px;
+    color: var(--text-faint);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .empty-state.hidden { display: none; }
+  .empty-state .icon {
+    font-family: var(--font-display);
+    font-size: 48px;
+    font-style: italic;
+    color: var(--accent);
+    opacity: 0.4;
+    line-height: 1;
+    margin-bottom: 16px;
+  }
+  .empty-state .title {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .empty-state .sub {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+
+  /* AG Grid theming via CSS variables (theme: quartz) */
+  .ag-theme-quartz, .ag-theme-quartz-dark {
+    --ag-font-family: var(--font-body);
+    --ag-font-size: 13px;
+    --ag-background-color: var(--bg-elev);
+    --ag-foreground-color: var(--text);
+    --ag-header-background-color: var(--bg-elev);
+    --ag-header-foreground-color: var(--text-dim);
+    --ag-border-color: var(--border);
+    --ag-row-border-color: var(--border);
+    --ag-odd-row-background-color: var(--bg-elev);
+    --ag-row-hover-color: var(--bg-sunken);
+    --ag-selected-row-background-color: var(--accent-soft);
+    --ag-input-focus-border-color: var(--accent);
+    --ag-header-column-resize-handle-color: var(--border);
+    --ag-control-panel-background-color: var(--bg-elev);
+    --ag-cell-horizontal-padding: 16px;
+    --ag-grid-size: 6px;
+    --ag-list-item-height: 32px;
+  }
+  .ag-theme-quartz .ag-header-cell-text,
+  .ag-theme-quartz-dark .ag-header-cell-text {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+  .mono-cell { font-family: var(--font-mono); font-size: 12px; }
+  .principal-cell { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px; }
+  .principal-icon {
+    width: 18px; height: 18px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 4px;
+    background: var(--bg-sunken);
+    color: var(--text-dim);
+    font-size: 10px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+  }
+  .badge.allow { background: var(--allow-bg); color: var(--allow); }
+  .badge.deny { background: var(--deny-bg); color: var(--deny); }
+  .badge .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor;
+  }
+  .action-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  /* Loading / empty */
+  .overlay-msg {
+    display: flex; align-items: center; justify-content: center;
+    height: 100%;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 5px;
+    border: 2px solid var(--bg-elev);
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+  @media (max-width: 900px) {
+    .topbar, .toolbar, .grid-wrap { padding-left: 20px; padding-right: 20px; }
+    .title-row { flex-direction: column; align-items: flex-start; gap: 16px; }
+    .stats { width: 100%; justify-content: space-between; }
+  }
+</style>
+</head>
+<body data-theme="light">
+
+<div class="app">
+  <main class="main">
+    <div class="topbar">
+      <div style="font-family: var(--font-display); font-size: 14px; font-weight: 500; letter-spacing: -0.01em; color: var(--text-dim);">
+        <span style="font-style: italic; color: var(--accent);">Vasara</span> Entitlements
+      </div>
+      <div class="title-row">
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-faint);">Domain</span>
+            <div class="domain-select-wrap">
+              <select class="domain-select" id="domainSelect">
+                <option value="">Loading…</option>
+              </select>
+            </div>
+            <span id="connStatus" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); margin-left: 6px;">● connected</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: flex-end; gap: 28px;">
+          <div class="stats">
+            <div class="stat">
+              <div class="stat-label">Total</div>
+              <div class="stat-value" id="statTotal">0</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Allow</div>
+              <div class="stat-value allow" id="statAllow">0</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Deny</div>
+              <div class="stat-value deny" id="statDeny">0</div>
+            </div>
+          </div>
+          <button class="theme-toggle" id="themeToggle">◐ theme</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <input type="text" class="search" id="searchInput" placeholder="Search principal, action, resource…" />
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Effect</span>
+        <button class="chip active" data-effect="ALL">All</button>
+        <button class="chip" data-effect="ALLOW">Allow</button>
+        <button class="chip" data-effect="DENY">Deny</button>
+      </div>
+    </div>
+
+    <div class="grid-wrap">
+      <div class="grid-shell">
+        <div id="grid" class="ag-theme-quartz" style="height: 100%; width: 100%;"></div>
+      </div>
+      <div id="emptyState" class="empty-state hidden">
+        <div class="icon">∅</div>
+        <div class="title">No entitlements</div>
+        <div class="sub" id="emptySub">Select a domain to view its policies</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* =========================================================================
+   CONFIG — point this at your REST service.
+   Expected shape:
+     GET /api/domains              -> [{ name: "trading" }, { name: "ops" }, ...]
+     GET /api/domains/:name/entitlements
+                                   -> [{ principal, action, resource, effect }, ...]
+   The fetcher gracefully falls back to demo data if the service is unreachable.
+   ========================================================================= */
+const API_BASE = ''; // e.g. 'https://entitlements.example.com'
+const ENDPOINTS = {
+  domains: () => `${API_BASE}/api/domains`,
+  entitlements: (d) => `${API_BASE}/api/domains/${encodeURIComponent(d)}/entitlements`,
+};
+
+/* ---- Demo fallback data ---- */
+const DEMO = {
+  domains: ['trading', 'accounts', 'risk', 'reference-data', 'ops'],
+  entitlements: {
+    trading: [
+      { principal: 'group:traders-eq', action: 'read',   resource: '/trades',          effect: 'ALLOW' },
+      { principal: 'group:traders-eq', action: 'write',  resource: '/trades',          effect: 'ALLOW' },
+      { principal: 'group:traders-eq', action: 'delete', resource: '/trades',          effect: 'DENY'  },
+      { principal: 'user:m.harrison',  action: 'write',  resource: '/trades/blocks',   effect: 'ALLOW' },
+      { principal: 'group:ops',        action: 'read',   resource: '/trades',          effect: 'ALLOW' },
+      { principal: 'group:auditors',   action: 'read',   resource: '/trades',          effect: 'ALLOW' },
+      { principal: 'group:auditors',   action: 'write',  resource: '/trades',          effect: 'DENY'  },
+      { principal: 'svc:trade-router', action: 'write',  resource: '/trades/inbound',  effect: 'ALLOW' },
+    ],
+    accounts: [
+      { principal: 'group:onboarding', action: 'read',   resource: '/accounts',        effect: 'ALLOW' },
+      { principal: 'group:onboarding', action: 'write',  resource: '/accounts',        effect: 'ALLOW' },
+      { principal: 'group:onboarding', action: 'delete', resource: '/accounts',        effect: 'DENY'  },
+      { principal: 'user:s.patel',     action: 'write',  resource: '/accounts/kyc',    effect: 'ALLOW' },
+      { principal: 'group:cs-tier1',   action: 'read',   resource: '/accounts',        effect: 'ALLOW' },
+      { principal: 'group:cs-tier1',   action: 'write',  resource: '/accounts/notes',  effect: 'ALLOW' },
+    ],
+    risk: [
+      { principal: 'group:risk-mgmt',  action: 'read',   resource: '/risk/limits',     effect: 'ALLOW' },
+      { principal: 'group:risk-mgmt',  action: 'write',  resource: '/risk/limits',     effect: 'ALLOW' },
+      { principal: 'group:traders-eq', action: 'read',   resource: '/risk/limits',     effect: 'ALLOW' },
+      { principal: 'group:traders-eq', action: 'write',  resource: '/risk/limits',     effect: 'DENY'  },
+      { principal: 'svc:var-engine',   action: 'read',   resource: '/risk/positions',  effect: 'ALLOW' },
+    ],
+    'reference-data': [
+      { principal: 'group:ref-data-eds', action: 'write', resource: '/ref/instruments', effect: 'ALLOW' },
+      { principal: 'group:ref-data-eds', action: 'delete',resource: '/ref/instruments', effect: 'ALLOW' },
+      { principal: '*',                  action: 'read',  resource: '/ref/instruments', effect: 'ALLOW' },
+      { principal: '*',                  action: 'read',  resource: '/ref/calendars',   effect: 'ALLOW' },
+    ],
+    ops: [
+      { principal: 'group:sre',        action: 'read',   resource: '/ops/health',      effect: 'ALLOW' },
+      { principal: 'group:sre',        action: 'write',  resource: '/ops/feature-flags', effect: 'ALLOW' },
+      { principal: 'group:devs',       action: 'read',   resource: '/ops/feature-flags', effect: 'ALLOW' },
+      { principal: 'group:devs',       action: 'write',  resource: '/ops/feature-flags', effect: 'DENY'  },
+    ],
+  },
+};
+
+/* ---- State ---- */
+const state = {
+  domains: [],
+  currentDomain: null,
+  entitlements: [],
+  effectFilter: 'ALL',
+  usingDemo: false,
+};
+
+/* ---- Data layer ---- */
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+async function loadDomains() {
+  if (!API_BASE) { state.usingDemo = true; return DEMO.domains; }
+  try {
+    const data = await fetchJSON(ENDPOINTS.domains());
+    return Array.isArray(data) ? data.map(d => typeof d === 'string' ? d : d.name) : [];
+  } catch (e) {
+    state.usingDemo = true;
+    return DEMO.domains;
+  }
+}
+async function loadEntitlements(domain) {
+  if (!API_BASE) { state.usingDemo = true; return DEMO.entitlements[domain] || []; }
+  try {
+    const data = await fetchJSON(ENDPOINTS.entitlements(domain));
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    state.usingDemo = true;
+    return DEMO.entitlements[domain] || [];
+  }
+}
+
+/* ---- AG Grid setup ---- */
+let gridApi = null;
+
+function principalRenderer(p) {
+  const v = p.value || '';
+  const kind = v.split(':')[0];
+  const initial = kind === 'user' ? 'U' : kind === 'group' ? 'G' : kind === 'svc' ? 'S' : '★';
+  return `<span class="principal-cell"><span class="principal-icon">${initial}</span>${v}</span>`;
+}
+function actionRenderer(p) {
+  return `<span class="action-tag">${p.value}</span>`;
+}
+function resourceRenderer(p) {
+  return `<span class="mono-cell">${p.value}</span>`;
+}
+function effectRenderer(p) {
+  const v = (p.value || '').toUpperCase();
+  const cls = v === 'ALLOW' ? 'allow' : 'deny';
+  return `<span class="badge ${cls}"><span class="dot"></span>${v}</span>`;
+}
+
+const columnDefs = [
+  { headerName: 'Principal', field: 'principal', flex: 2, minWidth: 220, cellRenderer: principalRenderer, filter: 'agTextColumnFilter' },
+  { headerName: 'Action',    field: 'action',    flex: 1, minWidth: 120, cellRenderer: actionRenderer, filter: 'agSetColumnFilter' },
+  { headerName: 'Resource',  field: 'resource',  flex: 2, minWidth: 220, cellRenderer: resourceRenderer, filter: 'agTextColumnFilter' },
+  { headerName: 'Effect',    field: 'effect',    width: 130, cellRenderer: effectRenderer, filter: 'agSetColumnFilter',
+    comparator: (a, b) => (a || '').localeCompare(b || '') },
+];
+
+function initGrid() {
+  const gridDiv = document.getElementById('grid');
+  const options = {
+    columnDefs,
+    rowData: [],
+    defaultColDef: {
+      sortable: true,
+      resizable: true,
+      filter: true,
+      suppressHeaderMenuButton: false,
+    },
+    rowHeight: 44,
+    headerHeight: 40,
+    animateRows: true,
+    suppressCellFocus: true,
+    overlayNoRowsTemplate: '<div class="overlay-msg">No entitlements match your filters</div>',
+    overlayLoadingTemplate: '<div class="overlay-msg">Loading entitlements…</div>',
+    isExternalFilterPresent: () => state.effectFilter !== 'ALL',
+    doesExternalFilterPass: (node) => node.data && node.data.effect === state.effectFilter,
+  };
+  gridApi = agGrid.createGrid(gridDiv, options);
+}
+
+/* ---- UI rendering ---- */
+function renderDomainSelect() {
+  const sel = document.getElementById('domainSelect');
+  if (!state.domains.length) {
+    sel.innerHTML = '<option value="">No domains</option>';
+    return;
+  }
+  sel.innerHTML = state.domains.map(d =>
+    `<option value="${d}" ${d === state.currentDomain ? 'selected' : ''}>${d}</option>`
+  ).join('');
+}
+
+function renderStats() {
+  const total = state.entitlements.length;
+  const allow = state.entitlements.filter(e => e.effect === 'ALLOW').length;
+  const deny  = state.entitlements.filter(e => e.effect === 'DENY').length;
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statAllow').textContent = allow;
+  document.getElementById('statDeny').textContent  = deny;
+}
+
+function renderHeader() {
+  const domain = state.currentDomain || '—';
+  document.title = `Entitlements: ${domain}`;
+}
+
+async function selectDomain(domain) {
+  state.currentDomain = domain;
+  renderDomainSelect();
+  renderHeader();
+  if (gridApi) gridApi.setGridOption('loading', true);
+  state.entitlements = await loadEntitlements(domain);
+  renderStats();
+  if (gridApi) {
+    gridApi.setGridOption('rowData', state.entitlements);
+    gridApi.setGridOption('loading', false);
+  }
+  toggleEmptyState();
+  updateConnStatus();
+}
+
+function toggleEmptyState() {
+  const empty = document.getElementById('emptyState');
+  const sub = document.getElementById('emptySub');
+  if (!state.currentDomain) {
+    empty.classList.remove('hidden');
+    sub.textContent = 'Select a domain to view its policies';
+  } else if (!state.entitlements.length) {
+    empty.classList.remove('hidden');
+    sub.textContent = `No entitlements defined for ${state.currentDomain}`;
+  } else {
+    empty.classList.add('hidden');
+  }
+}
+
+function updateConnStatus() {
+  const el = document.getElementById('connStatus');
+  if (state.usingDemo) {
+    el.innerHTML = '◐ demo data';
+    el.style.color = 'var(--accent)';
+  } else {
+    el.innerHTML = '● connected';
+    el.style.color = 'var(--allow)';
+  }
+}
+
+/* ---- Wire up controls ---- */
+document.getElementById('domainSelect').addEventListener('change', (e) => {
+  if (e.target.value) selectDomain(e.target.value);
+});
+
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  if (gridApi) gridApi.setGridOption('quickFilterText', e.target.value);
+});
+
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    state.effectFilter = chip.dataset.effect;
+    if (gridApi) gridApi.onFilterChanged();
+  });
+});
+
+/* ---- Theme ---- */
+const THEME_KEY = 'entitlements-theme';
+function applyTheme(theme) {
+  document.body.dataset.theme = theme;
+  const gridEl = document.getElementById('grid');
+  gridEl.className = theme === 'dark' ? 'ag-theme-quartz-dark' : 'ag-theme-quartz';
+  try { localStorage.setItem(THEME_KEY, theme); } catch (_) {}
+}
+document.getElementById('themeToggle').addEventListener('click', () => {
+  const next = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+});
+
+/* ---- Boot ---- */
+(async function init() {
+  let savedTheme = 'light';
+  try {
+    savedTheme = localStorage.getItem(THEME_KEY)
+      || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  } catch (_) {}
+  applyTheme(savedTheme);
+
+  initGrid();
+  state.domains = await loadDomains();
+  renderDomainSelect();
+  updateConnStatus();
+  if (state.domains.length) {
+    await selectDomain(state.domains[0]);
+  } else {
+    toggleEmptyState();
+  }
+})();
+</script>
+</body>
+</html>
