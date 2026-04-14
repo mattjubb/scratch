@@ -465,13 +465,17 @@
   .badge {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 5px;
-    padding: 1px 7px;
+    width: 72px;
+    height: 16px;
+    padding: 0;
     border-radius: 999px;
     font-family: var(--font-mono);
     font-size: 9px;
     font-weight: 600;
     letter-spacing: 0.06em;
+    line-height: 1;
   }
   .badge.allow { background: var(--allow-bg); color: var(--allow); }
   .badge.deny { background: var(--deny-bg); color: var(--deny); }
@@ -480,14 +484,19 @@
     background: currentColor;
   }
   .action-tag {
-    display: inline-block;
-    padding: 1px 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 16px;
+    padding: 0;
     border-radius: 4px;
     background: var(--bg-sunken);
     border: 1px solid var(--border);
     font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-dim);
+    line-height: 1;
   }
 
   /* Loading / empty */
