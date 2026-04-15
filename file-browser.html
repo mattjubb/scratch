@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<title>File Browser</title>
+<style>
+  :root[data-theme="light"] {
+    --bg: #f5f5f5;
+    --surface: #ffffff;
+    --surface-2: #f0f0f0;
+    --surface-3: #eaeaea;
+    --border: #d8d8d8;
+    --border-subtle: #ececec;
+    --text: #222;
+    --text-muted: #888;
+    --text-faint: #aaa;
+    --accent-bg: #dbeafe;
+    --accent-bg-hover: #bfd8f5;
+    --hover: #f5f9ff;
+    --error: #c00;
+    --json-key: #0550ae;
+    --json-string: #a31515;
+    --json-number: #098658;
+    --json-boolean: #0000ff;
+    --json-null: #0000ff;
+    --json-punct: #444;
+    --json-toggle: #888;
+  }
+  :root[data-theme="dark"] {
+    --bg: #1a1a1a;
+    --surface: #242424;
+    --surface-2: #2d2d2d;
+    --surface-3: #333;
+    --border: #3a3a3a;
+    --border-subtle: #2e2e2e;
+    --text: #e4e4e4;
+    --text-muted: #999;
+    --text-faint: #666;
+    --accent-bg: #1e3a5f;
+    --accent-bg-hover: #274b78;
+    --hover: #2a2f38;
+    --error: #f48771;
+    --json-key: #9cdcfe;
+    --json-string: #ce9178;
+    --json-number: #b5cea8;
+    --json-boolean: #569cd6;
+    --json-null: #569cd6;
+    --json-punct: #d4d4d4;
+    --json-toggle: #858585;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  .app { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .toolbar-title { font-weight: 600; font-size: 13px; }
+  .theme-toggle {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .theme-toggle:hover { background: var(--surface-3); }
+
+  .columns { display: flex; flex: 1; overflow: hidden; }
+  .col {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .col:last-child { border-right: none; }
+  .col-tree  { width: 25%; }
+  .col-files { width: 25%; }
+  .col-json  { width: 50%; }
+
+  .col-header {
+    padding: 6px 10px 6px 14px;
+    font-weight: 600;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 36px;
+  }
+  .col-body { flex: 1; overflow-y: auto; overflow-x: auto; }
+
+  /* Icons */
+  .icon {
+    width: 16px; height: 16px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    flex-shrink: 0; vertical-align: middle;
+  }
+  .icon-folder  { color: #e8a33d; }
+  .icon-file    { color: var(--text-muted); }
+  .icon-chevron { color: var(--text-muted); width: 12px; height: 12px; transition: transform .12s ease; }
+  .tree-node.expanded > .tree-row .icon-chevron { transform: rotate(90deg); }
+
+  /* Header button */
+  .btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 9px; font-size: 11px; font-weight: 600;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 5px;
+    color: var(--text); cursor: pointer;
+    text-transform: none; letter-spacing: 0; font-family: inherit;
+  }
+  .btn:hover:not(:disabled) { background: var(--hover); border-color: var(--text-faint); }
+  .btn:active:not(:disabled) { background: var(--surface-3); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn .icon { width: 13px; height: 13px; }
+  .btn-primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .btn-primary:hover:not(:disabled) { background: #1d4ed8; border-color: #1d4ed8; }
+  .btn-danger { color: #b91c1c; }
+  .btn-danger:hover:not(:disabled) { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+  :root[data-theme="dark"] .btn-danger { color: #f87171; }
+  :root[data-theme="dark"] .btn-danger:hover:not(:disabled) { background: #3a1d1d; border-color: #7f1d1d; color: #fca5a5; }
+  .header-actions { display: flex; gap: 6px; align-items: center; }
+  .btn-icon-only { padding: 4px 6px; }
+
+  /* Metadata panel (expander under Details header) */
+  #btn-toggle-meta .icon-chevron { transition: transform .15s ease; }
+  .meta-panel {
+    max-height: 0;
+    overflow: hidden;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    transition: max-height .2s ease;
+    flex-shrink: 0;
+  }
+  .meta-panel.open { max-height: 300px; overflow-y: auto; }
+  .meta-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 14px;
+    padding: 10px 14px;
+    font-size: 12px;
+    align-items: baseline;
+  }
+  .meta-label {
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .meta-value {
+    color: var(--text);
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    word-break: break-all;
+  }
+  .meta-value.muted { color: var(--text-faint); font-style: italic; font-family: inherit; }
+  .meta-empty {
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--text-faint);
+    font-style: italic;
+  }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.4);
+    display: none; align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--surface); color: var(--text);
+    border-radius: 8px; padding: 20px; min-width: 360px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.3);
+    border: 1px solid var(--border);
+  }
+  .modal h3 { font-size: 14px; margin-bottom: 6px; }
+  .modal .hint { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; word-break: break-all; }
+  .modal input {
+    width: 100%; padding: 8px 10px; font-size: 13px; font-family: inherit;
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: 5px; outline: none;
+  }
+  .modal input:focus { border-color: #7aa8e0; box-shadow: 0 0 0 2px rgba(122,168,224,.25); }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .modal-error { color: var(--error); font-size: 12px; margin-top: 8px; min-height: 14px; }
+  .modal-field { margin-top: 12px; }
+  .modal-field label.field-label {
+    display: block; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .5px;
+    color: var(--text-muted); margin-bottom: 6px;
+  }
+  .radio-group { display: flex; gap: 6px; }
+  .radio-option {
+    flex: 1;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 5px;
+    background: var(--surface);
+    cursor: pointer; font-size: 12px;
+    user-select: none;
+  }
+  .radio-option:hover { background: var(--hover); }
+  .radio-option input { display: none; }
+  .radio-option.checked {
+    border-color: #2563eb;
+    background: var(--accent-bg);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .hidden { display: none !important; }
+
+  .tree-node { user-select: none; }
+  .tree-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    border-radius: 4px;
+    margin: 1px 4px;
+  }
+  .tree-row:hover { background: var(--surface-3); }
+  .tree-row.selected { background: var(--accent-bg); }
+  .tree-row.selected:hover { background: var(--accent-bg-hover); }
+  .tree-toggle {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px;
+    flex-shrink: 0;
+  }
+  .tree-toggle.empty { visibility: hidden; }
+  .tree-children { display: none; }
+  .tree-node.expanded > .tree-children { display: block; }
+  .tree-loading, .tree-empty {
+    padding: 5px 8px 5px 24px;
+    color: var(--text-faint);
+    font-style: italic;
+  }
+
+  .file-row {
+    display: flex;
+    align-items: center;
+    padding: 7px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .file-row:hover { background: var(--hover); }
+  .file-row.selected { background: var(--accent-bg); }
+  .file-icon { margin-right: 10px; flex-shrink: 0; }
+  .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .file-size { color: var(--text-muted); font-size: 11px; margin-left: 10px; flex-shrink: 0; }
+
+  .loader, .empty-state {
+    padding: 14px;
+    text-align: center;
+    color: var(--text-faint);
+    font-style: italic;
+    font-size: 12px;
+  }
+  .placeholder {
+    padding: 20px;
+    color: var(--text-faint);
+    font-style: italic;
+  }
+  .error { color: var(--error); }
+
+  .col-json .col-body {
+    padding: 14px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .json-key     { color: var(--json-key); }
+  .json-string  { color: var(--json-string); }
+  .json-number  { color: var(--json-number); }
+  .json-boolean { color: var(--json-boolean); }
+  .json-null    { color: var(--json-null); }
+  .json-punct   { color: var(--json-punct); }
+  .json-toggle {
+    cursor: pointer;
+    user-select: none;
+    display: inline-block;
+    width: 12px;
+    color: var(--json-toggle);
+  }
+  .json-collapsible { display: inline; }
+  .json-collapsed > .json-body { display: none; }
+  .json-collapsed > .json-ellipsis { display: inline; }
+  .json-ellipsis { display: none; color: var(--json-toggle); }
+  .json-indent { padding-left: 18px; }
+
+  .col-body::-webkit-scrollbar { width: 10px; height: 10px; }
+  .col-body::-webkit-scrollbar-track { background: transparent; }
+  .col-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+  .col-body::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="toolbar">
+    <div class="toolbar-title">File Browser</div>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+      <span id="theme-icon-slot"></span>
+      <span id="theme-label">Dark</span>
+    </button>
+  </div>
+  <div class="columns">
+    <div class="col col-tree">
+      <div class="col-header">
+        <span>Folders</span>
+        <div class="header-actions">
+          <button class="btn" id="btn-new-folder" disabled title="Select a folder first">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+            New
+          </button>
+          <button class="btn btn-danger btn-icon-only" id="btn-delete-folder" disabled title="Delete folder">
+            <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="col-body" id="tree"></div>
+    </div>
+    <div class="col col-files">
+      <div class="col-header">
+        <span id="files-header">Files</span>
+        <div class="header-actions">
+          <button class="btn btn-icon-only" id="btn-copy-file" disabled title="Copy file">
+            <svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+          <button class="btn btn-icon-only" id="btn-move-file" disabled title="Move file">
+            <svg class="icon" viewBox="0 0 24 24"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+          </button>
+          <button class="btn btn-danger btn-icon-only" id="btn-delete-file" disabled title="Delete file">
+            <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="col-body" id="files">
+        <div class="placeholder">Select a folder</div>
+      </div>
+    </div>
+    <div class="col col-json">
+      <div class="col-header">
+        <span>Details</span>
+        <button class="btn btn-icon-only" id="btn-toggle-meta" title="Show metadata">
+          <svg class="icon icon-chevron" id="meta-chevron" viewBox="0 0 24 24" style="transform:rotate(90deg)"><polyline points="9 6 15 12 9 18"/></svg>
+        </button>
+      </div>
+      <div class="meta-panel" id="meta-panel">
+        <div class="meta-empty">No item selected</div>
+      </div>
+      <div class="col-body" id="json">
+        <div class="placeholder">Select a file or folder</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <h3>Create folder</h3>
+    <div class="hint" id="modal-parent">in /</div>
+    <input type="text" id="modal-input" placeholder="Folder name" autocomplete="off" spellcheck="false">
+
+    <div class="modal-field">
+      <label class="field-label">Type</label>
+      <div class="radio-group" id="modal-type-group">
+        <label class="radio-option checked"><input type="radio" name="folder-type" value="normal" checked>Normal</label>
+        <label class="radio-option"><input type="radio" name="folder-type" value="temporal">Temporal</label>
+        <label class="radio-option"><input type="radio" name="folder-type" value="symlink">Symlink</label>
+      </div>
+    </div>
+
+    <div class="modal-field hidden" id="modal-target-field">
+      <label class="field-label" for="modal-target">Target</label>
+      <input type="text" id="modal-target" placeholder="Path this symlink points to" autocomplete="off" spellcheck="false">
+    </div>
+
+    <div class="modal-error" id="modal-error"></div>
+    <div class="modal-actions">
+      <button class="btn" id="modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="modal-create">Create</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="confirm-modal">
+  <div class="modal">
+    <h3 id="confirm-title">Confirm</h3>
+    <div class="hint" id="confirm-message">Are you sure?</div>
+    <div class="modal-error" id="confirm-error"></div>
+    <div class="modal-actions">
+      <button class="btn" id="confirm-cancel">Cancel</button>
+      <button class="btn btn-danger" id="confirm-ok">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="transfer-modal">
+  <div class="modal">
+    <h3 id="transfer-title">Move file</h3>
+    <div class="hint" id="transfer-source">file.txt</div>
+    <div class="modal-field">
+      <label class="field-label" for="transfer-dest">Destination folder</label>
+      <input type="text" id="transfer-dest" placeholder="e.g. docs/work/2026" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="modal-error" id="transfer-error"></div>
+    <div class="modal-actions">
+      <button class="btn" id="transfer-cancel">Cancel</button>
+      <button class="btn btn-primary" id="transfer-ok">Move</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Theme toggle
+// ============================================================
+const root = document.documentElement;
+const themeIconSlot = document.getElementById("theme-icon-slot");
+const themeLabel = document.getElementById("theme-label");
+
+const THEME_ICONS = {
+  moon: '<svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
+  sun:  '<svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="7" y2="7"/><line x1="17" y1="17" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="7" y2="17"/><line x1="17" y1="7" x2="19.1" y2="4.9"/></svg>',
+};
+
+function applyTheme(t) {
+  root.setAttribute("data-theme", t);
+  themeIconSlot.innerHTML = t === "dark" ? THEME_ICONS.sun : THEME_ICONS.moon;
+  themeLabel.textContent = t === "dark" ? "Light" : "Dark";
+  try { localStorage.setItem("fb-theme", t); } catch (e) {}
+}
+const saved = (() => { try { return localStorage.getItem("fb-theme"); } catch (e) { return null; } })();
+const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+applyTheme(saved || (prefersDark ? "dark" : "light"));
+document.getElementById("theme-toggle").addEventListener("click", () => {
+  applyTheme(root.getAttribute("data-theme") === "dark" ? "light" : "dark");
+});
+
+// ============================================================
+// API configuration
+// ============================================================
+const API = {
+  listFolders: (path) => `/api/folders?path=${encodeURIComponent(path)}`,
+  listFiles: (folderPath, offset, limit) =>
+    `/api/files?path=${encodeURIComponent(folderPath)}&offset=${offset}&limit=${limit}`,
+  itemDetails: (id) => `/api/details?id=${encodeURIComponent(id)}`,
+  createFolder: `/api/folders`,            // POST { parentPath, name, type, target? }
+  deleteFolder: (path) => `/api/folders?path=${encodeURIComponent(path)}`, // DELETE
+  deleteFile: (id) => `/api/files?id=${encodeURIComponent(id)}`,           // DELETE
+  moveFile: `/api/files/move`,             // POST { id, destPath }
+  copyFile: `/api/files/copy`,             // POST { id, destPath }
+};
+const PAGE_SIZE = 100;
+const USE_MOCK = true;
+
+const mockTree = {
+  "": [
+    { id: "f:docs", name: "Documents", path: "docs", hasChildren: true },
+    { id: "f:pics", name: "Pictures", path: "pics", hasChildren: true },
+    { id: "f:proj", name: "Projects", path: "proj", hasChildren: true },
+    { id: "f:empty", name: "Empty", path: "empty", hasChildren: false },
+  ],
+  "docs": [
+    { id: "f:docs/work", name: "Work", path: "docs/work", hasChildren: true },
+    { id: "f:docs/personal", name: "Personal", path: "docs/personal", hasChildren: false },
+  ],
+  "docs/work": [
+    { id: "f:docs/work/2025", name: "2025", path: "docs/work/2025", hasChildren: false },
+    { id: "f:docs/work/2026", name: "2026", path: "docs/work/2026", hasChildren: false },
+  ],
+  "pics": [{ id: "f:pics/vac", name: "Vacations", path: "pics/vac", hasChildren: false }],
+  "proj": [
+    { id: "f:proj/vertx", name: "vertx-server", path: "proj/vertx", hasChildren: false },
+    { id: "f:proj/grpc", name: "grpc-demo", path: "proj/grpc", hasChildren: false },
+  ],
+};
+
+function mockFilesFor(path) {
+  const counts = { "docs": 12, "docs/work": 350, "docs/work/2025": 820,
+                   "docs/work/2026": 45, "docs/personal": 8, "pics": 5,
+                   "pics/vac": 1200, "proj/vertx": 230, "proj/grpc": 90 };
+  const n = counts[path] ?? 0;
+  const arr = [];
+  for (let i = 0; i < n; i++) {
+    const id = `file:${path}/${i}`;
+    if (mockDeletedFiles.has(id)) continue;
+    if (mockMovedFiles.has(id)) continue; // original location no longer has it
+    arr.push({
+      id,
+      name: `file-${String(i).padStart(5, "0")}.txt`,
+      size: Math.floor(Math.random() * 500000),
+      modified: new Date(Date.now() - i * 3600_000).toISOString(),
+      folder: path,
+    });
+  }
+  // Append files that have been moved/copied into this folder
+  for (const entry of mockExtraFiles.get(path) || []) {
+    if (mockDeletedFiles.has(entry.id)) continue;
+    arr.push(entry);
+  }
+  return arr;
+}
+
+// Mock mutation tracking
+const mockDeletedFiles = new Set();
+const mockMovedFiles = new Set();        // ids that have been moved away from their original folder
+const mockExtraFiles = new Map();        // folderPath -> [file, ...]
+function addExtraFile(path, file) {
+  if (!mockExtraFiles.has(path)) mockExtraFiles.set(path, []);
+  mockExtraFiles.get(path).push(file);
+}
+
+async function fetchJSON(url, options = {}) {
+  if (!USE_MOCK) {
+    const r = await fetch(url, options);
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    return r.json();
+  }
+  await new Promise(r => setTimeout(r, 150));
+  const u = new URL(url, "http://mock");
+  const method = (options.method || "GET").toUpperCase();
+
+  if (method === "POST" && u.pathname === "/api/folders") {
+    const body = JSON.parse(options.body || "{}");
+    const parent = body.parentPath || "";
+    const name = (body.name || "").trim();
+    const type = body.type || "normal";
+    const target = body.target || null;
+    if (!name) throw new Error("Name required");
+    if (type === "symlink" && !target) throw new Error("Target required for symlinks");
+    const newPath = parent ? `${parent}/${name}` : name;
+    if (!mockTree[parent]) mockTree[parent] = [];
+    if (mockTree[parent].some(f => f.name === name)) throw new Error("Folder already exists");
+    const entry = { id: `f:${newPath}`, name, path: newPath, hasChildren: false, type };
+    if (type === "symlink") entry.target = target;
+    mockTree[parent].push(entry);
+    return entry;
+  }
+
+  if (method === "DELETE" && u.pathname === "/api/folders") {
+    const path = u.searchParams.get("path") || "";
+    if (!path) throw new Error("Cannot delete root");
+    const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+    const name = path.includes("/") ? path.slice(path.lastIndexOf("/") + 1) : path;
+    const siblings = mockTree[parent] || [];
+    const idx = siblings.findIndex(f => f.name === name);
+    if (idx < 0) throw new Error("Folder not found");
+    siblings.splice(idx, 1);
+    // Clean up descendants in mockTree
+    for (const key of Object.keys(mockTree)) {
+      if (key === path || key.startsWith(path + "/")) delete mockTree[key];
+    }
+    return { ok: true };
+  }
+
+  if (method === "DELETE" && u.pathname === "/api/files") {
+    const id = u.searchParams.get("id") || "";
+    if (!id) throw new Error("id required");
+    mockDeletedFiles.add(id);
+    return { ok: true };
+  }
+
+  if (method === "POST" && (u.pathname === "/api/files/move" || u.pathname === "/api/files/copy")) {
+    const body = JSON.parse(options.body || "{}");
+    const id = body.id;
+    const destPath = body.destPath || "";
+    const isMove = u.pathname.endsWith("/move");
+    if (!id) throw new Error("id required");
+    // Validate destination exists in mock tree (or is root)
+    if (destPath !== "" && !Object.prototype.hasOwnProperty.call(mockTree, destPath)) {
+      // destPath is valid only if it appears in any parent's children list
+      const allPaths = new Set();
+      for (const kids of Object.values(mockTree)) kids.forEach(k => allPaths.add(k.path));
+      if (!allPaths.has(destPath)) throw new Error(`Destination folder not found: ${destPath}`);
+    }
+    // Synthesize the file name from the id
+    const name = id.split("/").pop().replace(/^(\d+)$/, m => `file-${String(m).padStart(5, "0")}.txt`);
+    const displayName = id.startsWith("file:") ? `file-${String(id.split("/").pop()).padStart(5, "0")}.txt` : name;
+    const newId = `${id}:${isMove ? "moved" : "copy"}:${Date.now()}`;
+    addExtraFile(destPath, {
+      id: newId,
+      name: displayName,
+      size: Math.floor(Math.random() * 500000),
+      modified: new Date().toISOString(),
+      folder: destPath,
+    });
+    if (isMove) mockMovedFiles.add(id);
+    return { ok: true, newId };
+  }
+
+  if (u.pathname === "/api/folders") {
+    return mockTree[u.searchParams.get("path") || ""] || [];
+  }
+
+
+  if (u.pathname === "/api/files") {
+    const path = u.searchParams.get("path") || "";
+    const offset = parseInt(u.searchParams.get("offset") || "0", 10);
+    const limit = parseInt(u.searchParams.get("limit") || "100", 10);
+    const all = mockFilesFor(path);
+    return { items: all.slice(offset, offset + limit), total: all.length };
+  }
+  if (u.pathname === "/api/details") {
+    const id = u.searchParams.get("id") || "";
+    return {
+      id, type: id.startsWith("f:") ? "folder" : "file",
+      name: id.split("/").pop(),
+      properties: {
+        created: "2026-01-15T10:00:00Z",
+        modified: new Date().toISOString(),
+        size: id.startsWith("f:") ? null : Math.floor(Math.random() * 1_000_000),
+        permissions: ["read", "write"],
+        tags: ["sample", "demo"],
+      },
+      metadata: {
+        owner: "matthew",
+        group: "staff",
+        nested: { deep: { value: 42, list: [1, 2, 3] } }
+      }
+    };
+  }
+  return null;
+}
+
+// ============================================================
+// SVG icon helpers
+// ============================================================
+const ICONS = {
+  chevron:      '<svg class="icon icon-chevron" viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>',
+  folder:       '<svg class="icon icon-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  folderOpen:   '<svg class="icon icon-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1H3zM3 9h18l-2 8a2 2 0 0 1-2 1H5a2 2 0 0 1-2-2z"/></svg>',
+  file:         '<svg class="icon icon-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 3 14 8 19 8"/></svg>',
+};
+function iconEl(html) {
+  const t = document.createElement("template");
+  t.innerHTML = html.trim();
+  return t.content.firstChild;
+}
+
+// ============================================================
+// Folder tree
+// ============================================================
+const treeEl = document.getElementById("tree");
+let selectedTreeRow = null;
+let selectedFileRow = null;
+let selectedFolder = null;  // { path, name, node }
+let selectedFile = null;    // { id, name, row, item }
+
+async function renderTreeChildren(container, parentPath) {
+  container.innerHTML = '<div class="tree-loading">Loading…</div>';
+  try {
+    const folders = await fetchJSON(API.listFolders(parentPath));
+    container.innerHTML = "";
+    if (!folders.length) {
+      container.innerHTML = '<div class="tree-empty">(empty)</div>';
+      return;
+    }
+    folders.forEach(f => container.appendChild(createTreeNode(f)));
+  } catch (e) {
+    container.innerHTML = `<div class="tree-empty error">Error: ${e.message}</div>`;
+  }
+}
+
+function createTreeNode(folder) {
+  const node = document.createElement("div");
+  node.className = "tree-node";
+  node.dataset.loaded = "false";
+  node.dataset.path = folder.path;
+
+  const row = document.createElement("div");
+  row.className = "tree-row";
+
+  const toggle = document.createElement("span");
+  toggle.className = "tree-toggle" + (folder.hasChildren ? "" : " empty");
+  toggle.appendChild(iconEl(ICONS.chevron));
+
+  const icon = iconEl(ICONS.folder);
+
+  const label = document.createElement("span");
+  label.textContent = folder.name;
+
+  row.appendChild(toggle);
+  row.appendChild(icon);
+  row.appendChild(label);
+
+  const children = document.createElement("div");
+  children.className = "tree-children";
+  children.style.paddingLeft = "16px";
+
+  node.appendChild(row);
+  node.appendChild(children);
+
+  // Store refs for later (create-folder insertion + expansion)
+  node._folder = folder;
+  node._children = children;
+  node._toggle = toggle;
+  node._iconEl = icon;
+
+  const expand = async () => {
+    if (!folder.hasChildren) return;
+    node.classList.add("expanded");
+    // Swap icon to open variant
+    const newIcon = iconEl(ICONS.folderOpen);
+    node._iconEl.replaceWith(newIcon);
+    node._iconEl = newIcon;
+    if (node.dataset.loaded === "false") {
+      node.dataset.loaded = "true";
+      await renderTreeChildren(children, folder.path);
+    }
+  };
+  const collapse = () => {
+    node.classList.remove("expanded");
+    const newIcon = iconEl(ICONS.folder);
+    node._iconEl.replaceWith(newIcon);
+    node._iconEl = newIcon;
+  };
+  node._expand = expand;
+
+  toggle.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (!folder.hasChildren) return;
+    if (node.classList.contains("expanded")) collapse();
+    else await expand();
+  });
+
+  row.addEventListener("click", () => {
+    if (selectedTreeRow) selectedTreeRow.classList.remove("selected");
+    row.classList.add("selected");
+    selectedTreeRow = row;
+    selectedFolder = { path: folder.path, name: folder.name, node };
+    newFolderBtn.disabled = false;
+    newFolderBtn.title = `New folder in ${folder.path || "/"}`;
+    deleteFolderBtn.disabled = false;
+    deleteFolderBtn.title = `Delete ${folder.path}`;
+    loadFiles(folder.path, folder.name);
+    loadDetails(folder.id);
+  });
+
+  return node;
+}
+
+// ============================================================
+// Files (infinite scroll)
+// ============================================================
+const filesEl = document.getElementById("files");
+const filesHeader = document.getElementById("files-header");
+let fileState = null;
+
+function loadFiles(path, displayName) {
+  filesHeader.textContent = `Files — ${displayName || path || "root"}`;
+  filesEl.innerHTML = "";
+  fileState = { path, offset: 0, total: null, loading: false, done: false };
+  selectedFile = null;
+  selectedFileRow = null;
+  setFileButtonsEnabled(false);
+  loadNextFilePage();
+}
+
+async function loadNextFilePage() {
+  if (!fileState || fileState.loading || fileState.done) return;
+  fileState.loading = true;
+
+  const loader = document.createElement("div");
+  loader.className = "loader";
+  loader.textContent = "Loading…";
+  filesEl.appendChild(loader);
+
+  try {
+    const res = await fetchJSON(API.listFiles(fileState.path, fileState.offset, PAGE_SIZE));
+    loader.remove();
+
+    const items = res.items || [];
+    fileState.total = res.total ?? fileState.total;
+
+    if (items.length === 0 && fileState.offset === 0) {
+      filesEl.innerHTML = '<div class="empty-state">No files</div>';
+      fileState.done = true;
+      fileState.loading = false;
+      return;
+    }
+
+    items.forEach(item => filesEl.appendChild(createFileRow(item)));
+    fileState.offset += items.length;
+
+    if (items.length < PAGE_SIZE || (fileState.total != null && fileState.offset >= fileState.total)) {
+      fileState.done = true;
+      const end = document.createElement("div");
+      end.className = "loader";
+      end.textContent = `— end — ${fileState.offset} file${fileState.offset === 1 ? "" : "s"}`;
+      filesEl.appendChild(end);
+    }
+  } catch (e) {
+    loader.textContent = `Error: ${e.message}`;
+    loader.classList.add("error");
+  } finally {
+    fileState.loading = false;
+  }
+}
+
+function createFileRow(item) {
+  const row = document.createElement("div");
+  row.className = "file-row";
+
+  const icon = iconEl(ICONS.file);
+  icon.classList.add("file-icon");
+
+  const name = document.createElement("span");
+  name.className = "file-name";
+  name.textContent = item.name;
+
+  const size = document.createElement("span");
+  size.className = "file-size";
+  size.textContent = formatSize(item.size);
+
+  row.appendChild(icon);
+  row.appendChild(name);
+  row.appendChild(size);
+
+  row.addEventListener("click", () => {
+    if (selectedFileRow) selectedFileRow.classList.remove("selected");
+    row.classList.add("selected");
+    selectedFileRow = row;
+    selectedFile = { id: item.id, name: item.name, row, item };
+    setFileButtonsEnabled(true);
+    loadDetails(item.id);
+  });
+
+  return row;
+}
+
+function formatSize(bytes) {
+  if (bytes == null) return "";
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + " MB";
+  return (bytes / 1024 / 1024 / 1024).toFixed(2) + " GB";
+}
+
+filesEl.addEventListener("scroll", () => {
+  if (!fileState || fileState.loading || fileState.done) return;
+  const nearBottom = filesEl.scrollTop + filesEl.clientHeight >= filesEl.scrollHeight - 50;
+  if (nearBottom) loadNextFilePage();
+});
+
+// ============================================================
+// JSON viewer
+// ============================================================
+const jsonEl = document.getElementById("json");
+const metaPanel = document.getElementById("meta-panel");
+const metaToggleBtn = document.getElementById("btn-toggle-meta");
+const metaChevron = document.getElementById("meta-chevron");
+
+metaToggleBtn.addEventListener("click", () => {
+  const open = metaPanel.classList.toggle("open");
+  metaChevron.style.transform = open ? "rotate(-90deg)" : "rotate(90deg)";
+  metaToggleBtn.title = open ? "Hide metadata" : "Show metadata";
+});
+
+function formatMetaValue(v) {
+  if (v == null) return { text: "—", muted: true };
+  if (typeof v === "string") {
+    // Attempt ISO date prettification
+    if (/^\d{4}-\d{2}-\d{2}T/.test(v)) {
+      const d = new Date(v);
+      if (!isNaN(d)) return { text: d.toLocaleString(), muted: false };
+    }
+    return { text: v, muted: false };
+  }
+  if (Array.isArray(v)) return { text: v.length ? v.join(", ") : "—", muted: !v.length };
+  if (typeof v === "object") return { text: JSON.stringify(v), muted: false };
+  return { text: String(v), muted: false };
+}
+
+function renderMetadata(data) {
+  metaPanel.innerHTML = "";
+  if (!data) { metaPanel.appendChild(emptyMeta("No metadata")); return; }
+
+  // Flatten: pick top-level scalar-ish fields, plus properties + metadata sub-objects
+  const rows = [];
+  const skip = new Set(["properties", "metadata"]);
+  for (const [k, v] of Object.entries(data)) {
+    if (skip.has(k)) continue;
+    if (v !== null && typeof v === "object") continue; // skip nested non-meta
+    rows.push([k, v]);
+  }
+  if (data.properties && typeof data.properties === "object") {
+    for (const [k, v] of Object.entries(data.properties)) rows.push([k, v]);
+  }
+  if (data.metadata && typeof data.metadata === "object") {
+    for (const [k, v] of Object.entries(data.metadata)) {
+      if (v !== null && typeof v === "object" && !Array.isArray(v)) continue; // skip deeply nested
+      rows.push([k, v]);
+    }
+  }
+
+  if (!rows.length) { metaPanel.appendChild(emptyMeta("No metadata")); return; }
+
+  const grid = document.createElement("div");
+  grid.className = "meta-grid";
+  for (const [k, v] of rows) {
+    const label = document.createElement("div");
+    label.className = "meta-label";
+    label.textContent = k;
+    const val = document.createElement("div");
+    const fmt = formatMetaValue(v);
+    val.className = "meta-value" + (fmt.muted ? " muted" : "");
+    val.textContent = fmt.text;
+    grid.appendChild(label);
+    grid.appendChild(val);
+  }
+  metaPanel.appendChild(grid);
+}
+
+function emptyMeta(text) {
+  const d = document.createElement("div");
+  d.className = "meta-empty";
+  d.textContent = text;
+  return d;
+}
+
+async function loadDetails(id) {
+  jsonEl.innerHTML = '<div class="placeholder">Loading…</div>';
+  metaPanel.innerHTML = '<div class="meta-empty">Loading…</div>';
+  try {
+    const data = await fetchJSON(API.itemDetails(id));
+    jsonEl.innerHTML = "";
+    jsonEl.appendChild(renderJSON(data));
+    renderMetadata(data);
+  } catch (e) {
+    jsonEl.innerHTML = `<div class="placeholder error">Error: ${e.message}</div>`;
+    metaPanel.innerHTML = `<div class="meta-empty">Error: ${e.message}</div>`;
+  }
+}
+
+function renderJSON(value) {
+  const wrap = document.createElement("div");
+  wrap.appendChild(jsonValue(value, 0));
+  return wrap;
+}
+
+function jsonValue(v, depth) {
+  if (v === null) return span("json-null", "null");
+  if (typeof v === "boolean") return span("json-boolean", String(v));
+  if (typeof v === "number") return span("json-number", String(v));
+  if (typeof v === "string") return span("json-string", JSON.stringify(v));
+  if (Array.isArray(v)) return jsonArray(v, depth);
+  if (typeof v === "object") return jsonObject(v, depth);
+  return span("", String(v));
+}
+
+function jsonObject(obj, depth) {
+  const keys = Object.keys(obj);
+  const container = document.createElement("span");
+  container.className = "json-collapsible";
+
+  if (keys.length === 0) {
+    container.appendChild(span("json-punct", "{}"));
+    return container;
+  }
+
+  const toggle = document.createElement("span");
+  toggle.className = "json-toggle";
+  toggle.textContent = "▼";
+
+  const open = span("json-punct", "{");
+  const ellipsis = document.createElement("span");
+  ellipsis.className = "json-ellipsis";
+  ellipsis.textContent = ` … ${keys.length} `;
+
+  const body = document.createElement("span");
+  body.className = "json-body";
+
+  keys.forEach((k, i) => {
+    const line = document.createElement("div");
+    line.className = "json-indent";
+    line.appendChild(span("json-key", JSON.stringify(k)));
+    line.appendChild(span("json-punct", ": "));
+    line.appendChild(jsonValue(obj[k], depth + 1));
+    if (i < keys.length - 1) line.appendChild(span("json-punct", ","));
+    body.appendChild(line);
+  });
+
+  const close = document.createElement("div");
+  close.appendChild(span("json-punct", "}"));
+
+  toggle.addEventListener("click", () => {
+    const collapsed = container.classList.toggle("json-collapsed");
+    toggle.textContent = collapsed ? "▶" : "▼";
+  });
+
+  container.appendChild(toggle);
+  container.appendChild(open);
+  container.appendChild(ellipsis);
+  container.appendChild(body);
+  container.appendChild(close);
+  return container;
+}
+
+function jsonArray(arr, depth) {
+  const container = document.createElement("span");
+  container.className = "json-collapsible";
+
+  if (arr.length === 0) {
+    container.appendChild(span("json-punct", "[]"));
+    return container;
+  }
+
+  const toggle = document.createElement("span");
+  toggle.className = "json-toggle";
+  toggle.textContent = "▼";
+
+  const open = span("json-punct", "[");
+  const ellipsis = document.createElement("span");
+  ellipsis.className = "json-ellipsis";
+  ellipsis.textContent = ` … ${arr.length} `;
+
+  const body = document.createElement("span");
+  body.className = "json-body";
+
+  arr.forEach((v, i) => {
+    const line = document.createElement("div");
+    line.className = "json-indent";
+    line.appendChild(jsonValue(v, depth + 1));
+    if (i < arr.length - 1) line.appendChild(span("json-punct", ","));
+    body.appendChild(line);
+  });
+
+  const close = document.createElement("div");
+  close.appendChild(span("json-punct", "]"));
+
+  toggle.addEventListener("click", () => {
+    const collapsed = container.classList.toggle("json-collapsed");
+    toggle.textContent = collapsed ? "▶" : "▼";
+  });
+
+  container.appendChild(toggle);
+  container.appendChild(open);
+  container.appendChild(ellipsis);
+  container.appendChild(body);
+  container.appendChild(close);
+  return container;
+}
+
+function span(cls, text) {
+  const s = document.createElement("span");
+  if (cls) s.className = cls;
+  s.textContent = text;
+  return s;
+}
+
+// ============================================================
+// Create folder
+// ============================================================
+const newFolderBtn = document.getElementById("btn-new-folder");
+const modal = document.getElementById("modal");
+const modalInput = document.getElementById("modal-input");
+const modalParent = document.getElementById("modal-parent");
+const modalError = document.getElementById("modal-error");
+const modalCreate = document.getElementById("modal-create");
+const modalCancel = document.getElementById("modal-cancel");
+const modalTypeGroup = document.getElementById("modal-type-group");
+const modalTargetField = document.getElementById("modal-target-field");
+const modalTarget = document.getElementById("modal-target");
+
+function getSelectedType() {
+  const el = modalTypeGroup.querySelector('input[name="folder-type"]:checked');
+  return el ? el.value : "normal";
+}
+function refreshTypeUI() {
+  modalTypeGroup.querySelectorAll(".radio-option").forEach(opt => {
+    opt.classList.toggle("checked", opt.querySelector("input").checked);
+  });
+  modalTargetField.classList.toggle("hidden", getSelectedType() !== "symlink");
+}
+modalTypeGroup.addEventListener("change", refreshTypeUI);
+
+function openModal() {
+  if (!selectedFolder) return;
+  modalParent.textContent = `in /${selectedFolder.path}`;
+  modalInput.value = "";
+  modalTarget.value = "";
+  modalError.textContent = "";
+  // reset to "normal"
+  const normalRadio = modalTypeGroup.querySelector('input[value="normal"]');
+  normalRadio.checked = true;
+  refreshTypeUI();
+  modal.classList.add("open");
+  setTimeout(() => modalInput.focus(), 0);
+}
+function closeModal() { modal.classList.remove("open"); }
+
+newFolderBtn.addEventListener("click", openModal);
+modalCancel.addEventListener("click", closeModal);
+modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
+const onModalKey = (e) => {
+  if (e.key === "Enter") doCreate();
+  else if (e.key === "Escape") closeModal();
+};
+modalInput.addEventListener("keydown", onModalKey);
+modalTarget.addEventListener("keydown", onModalKey);
+modalCreate.addEventListener("click", doCreate);
+
+async function doCreate() {
+  const name = modalInput.value.trim();
+  const type = getSelectedType();
+  const target = modalTarget.value.trim();
+  modalError.textContent = "";
+  if (!name) { modalError.textContent = "Name is required"; return; }
+  if (/[\/\\]/.test(name)) { modalError.textContent = "Name cannot contain slashes"; return; }
+  if (type === "symlink" && !target) { modalError.textContent = "Target is required for symlinks"; return; }
+  if (!selectedFolder) return;
+
+  modalCreate.disabled = true;
+  modalCancel.disabled = true;
+  try {
+    const parentPath = selectedFolder.path;
+    const payload = { parentPath, name, type };
+    if (type === "symlink") payload.target = target;
+
+    const created = await fetchJSON(API.createFolder, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    // Update tree: make parent expandable if it wasn't, expand it, insert child
+    const parentNode = selectedFolder.node;
+    parentNode._folder.hasChildren = true;
+    parentNode._toggle.classList.remove("empty");
+
+    if (parentNode.dataset.loaded === "false") {
+      parentNode.dataset.loaded = "true";
+      await renderTreeChildren(parentNode._children, parentPath);
+    } else {
+      const empty = parentNode._children.querySelector(".tree-empty");
+      if (empty) empty.remove();
+      parentNode._children.appendChild(createTreeNode(created));
+    }
+
+    if (!parentNode.classList.contains("expanded")) {
+      await parentNode._expand();
+    }
+
+    closeModal();
+  } catch (e) {
+    modalError.textContent = e.message || "Failed to create folder";
+  } finally {
+    modalCreate.disabled = false;
+    modalCancel.disabled = false;
+  }
+}
+
+// ============================================================
+// File + folder actions (delete / move / copy)
+// ============================================================
+const deleteFolderBtn = document.getElementById("btn-delete-folder");
+const deleteFileBtn   = document.getElementById("btn-delete-file");
+const moveFileBtn     = document.getElementById("btn-move-file");
+const copyFileBtn     = document.getElementById("btn-copy-file");
+
+function setFileButtonsEnabled(enabled) {
+  [deleteFileBtn, moveFileBtn, copyFileBtn].forEach(b => { b.disabled = !enabled; });
+}
+
+// --- Confirm dialog (used for deletes) ---
+const confirmModal   = document.getElementById("confirm-modal");
+const confirmTitle   = document.getElementById("confirm-title");
+const confirmMessage = document.getElementById("confirm-message");
+const confirmError   = document.getElementById("confirm-error");
+const confirmOk      = document.getElementById("confirm-ok");
+const confirmCancel  = document.getElementById("confirm-cancel");
+let confirmHandler = null;
+
+function openConfirm({ title, message, okLabel = "Delete", onConfirm }) {
+  confirmTitle.textContent = title;
+  confirmMessage.textContent = message;
+  confirmOk.textContent = okLabel;
+  confirmError.textContent = "";
+  confirmHandler = onConfirm;
+  confirmModal.classList.add("open");
+}
+function closeConfirm() { confirmModal.classList.remove("open"); confirmHandler = null; }
+confirmCancel.addEventListener("click", closeConfirm);
+confirmModal.addEventListener("click", (e) => { if (e.target === confirmModal) closeConfirm(); });
+confirmOk.addEventListener("click", async () => {
+  if (!confirmHandler) return;
+  confirmOk.disabled = true; confirmCancel.disabled = true;
+  try {
+    await confirmHandler();
+    closeConfirm();
+  } catch (e) {
+    confirmError.textContent = e.message || "Action failed";
+  } finally {
+    confirmOk.disabled = false; confirmCancel.disabled = false;
+  }
+});
+
+// --- Transfer dialog (move / copy) ---
+const transferModal  = document.getElementById("transfer-modal");
+const transferTitle  = document.getElementById("transfer-title");
+const transferSource = document.getElementById("transfer-source");
+const transferDest   = document.getElementById("transfer-dest");
+const transferError  = document.getElementById("transfer-error");
+const transferOk     = document.getElementById("transfer-ok");
+const transferCancel = document.getElementById("transfer-cancel");
+let transferHandler = null;
+
+function openTransfer({ title, source, okLabel, onSubmit }) {
+  transferTitle.textContent = title;
+  transferSource.textContent = source;
+  transferOk.textContent = okLabel;
+  transferDest.value = "";
+  transferError.textContent = "";
+  transferHandler = onSubmit;
+  transferModal.classList.add("open");
+  setTimeout(() => transferDest.focus(), 0);
+}
+function closeTransfer() { transferModal.classList.remove("open"); transferHandler = null; }
+transferCancel.addEventListener("click", closeTransfer);
+transferModal.addEventListener("click", (e) => { if (e.target === transferModal) closeTransfer(); });
+transferDest.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") transferOk.click();
+  else if (e.key === "Escape") closeTransfer();
+});
+transferOk.addEventListener("click", async () => {
+  if (!transferHandler) return;
+  const dest = transferDest.value.trim();
+  transferError.textContent = "";
+  transferOk.disabled = true; transferCancel.disabled = true;
+  try {
+    await transferHandler(dest);
+    closeTransfer();
+  } catch (e) {
+    transferError.textContent = e.message || "Action failed";
+  } finally {
+    transferOk.disabled = false; transferCancel.disabled = false;
+  }
+});
+
+// --- Delete folder ---
+deleteFolderBtn.addEventListener("click", () => {
+  if (!selectedFolder) return;
+  const { path, node } = selectedFolder;
+  openConfirm({
+    title: "Delete folder",
+    message: `Delete "/${path}" and everything inside it? This cannot be undone.`,
+    okLabel: "Delete",
+    onConfirm: async () => {
+      await fetchJSON(API.deleteFolder(path), { method: "DELETE" });
+      node.remove();
+      selectedFolder = null;
+      selectedTreeRow = null;
+      deleteFolderBtn.disabled = true;
+      newFolderBtn.disabled = true;
+      // Clear downstream panels
+      filesEl.innerHTML = '<div class="placeholder">Select a folder</div>';
+      filesHeader.textContent = "Files";
+      jsonEl.innerHTML = '<div class="placeholder">Select a file or folder</div>';
+      fileState = null;
+      selectedFile = null;
+      setFileButtonsEnabled(false);
+    }
+  });
+});
+
+// --- Delete file ---
+deleteFileBtn.addEventListener("click", () => {
+  if (!selectedFile) return;
+  const { id, name, row } = selectedFile;
+  openConfirm({
+    title: "Delete file",
+    message: `Delete "${name}"? This cannot be undone.`,
+    okLabel: "Delete",
+    onConfirm: async () => {
+      await fetchJSON(API.deleteFile(id), { method: "DELETE" });
+      row.remove();
+      selectedFile = null;
+      selectedFileRow = null;
+      setFileButtonsEnabled(false);
+      jsonEl.innerHTML = '<div class="placeholder">Select a file or folder</div>';
+      if (fileState) fileState.offset = Math.max(0, fileState.offset - 1);
+    }
+  });
+});
+
+// --- Move file ---
+moveFileBtn.addEventListener("click", () => {
+  if (!selectedFile) return;
+  const { id, name, row } = selectedFile;
+  openTransfer({
+    title: "Move file",
+    source: name,
+    okLabel: "Move",
+    onSubmit: async (destPath) => {
+      if (!destPath && destPath !== "") throw new Error("Destination is required");
+      await fetchJSON(API.moveFile, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, destPath }),
+      });
+      // Remove from current view since it's been moved
+      row.remove();
+      selectedFile = null;
+      selectedFileRow = null;
+      setFileButtonsEnabled(false);
+      jsonEl.innerHTML = '<div class="placeholder">Select a file or folder</div>';
+    }
+  });
+});
+
+// --- Copy file ---
+copyFileBtn.addEventListener("click", () => {
+  if (!selectedFile) return;
+  const { id, name } = selectedFile;
+  openTransfer({
+    title: "Copy file",
+    source: name,
+    okLabel: "Copy",
+    onSubmit: async (destPath) => {
+      if (!destPath && destPath !== "") throw new Error("Destination is required");
+      await fetchJSON(API.copyFile, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, destPath }),
+      });
+      // Original stays visible; nothing to remove
+    }
+  });
+});
+
+renderTreeChildren(treeEl, "");
+</script>
+
+</body>
+</html>
