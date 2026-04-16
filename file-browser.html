@@ -364,6 +364,26 @@
   :root[data-theme="dark"] .status-result.ok   { color: #4ade80; }
   :root[data-theme="dark"] .status-result.fail { color: #f87171; }
   .status-idle { color: var(--text-faint); font-style: italic; font-family: inherit; }
+  .status-bar.error {
+    background: #fef2f2; border-top-color: #fca5a5;
+    color: #991b1b;
+  }
+  .status-bar.error .status-url,
+  .status-bar.error .status-timing,
+  .status-bar.error .status-result { color: #b91c1c; }
+  .status-bar.error .status-method { color: #fff; background: #dc2626; }
+  .status-bar.error .btn-timings { color: #b91c1c; border-color: #fca5a5; }
+  .status-bar.error .btn-timings:hover { background: #fee2e2; }
+  :root[data-theme="dark"] .status-bar.error {
+    background: #3a1616; border-top-color: #7f1d1d;
+    color: #fca5a5;
+  }
+  :root[data-theme="dark"] .status-bar.error .status-url,
+  :root[data-theme="dark"] .status-bar.error .status-timing,
+  :root[data-theme="dark"] .status-bar.error .status-result { color: #f87171; }
+  :root[data-theme="dark"] .status-bar.error .status-method { color: #fff; background: #991b1b; }
+  :root[data-theme="dark"] .status-bar.error .btn-timings { color: #f87171; border-color: #7f1d1d; }
+  :root[data-theme="dark"] .status-bar.error .btn-timings:hover { background: #4a1d1d; }
 
   .btn-timings {
     padding: 2px 6px; font-size: 10px; font-weight: 600;
@@ -450,7 +470,6 @@
         </div>
       </div>
       <div class="col-body" id="files">
-        <div class="placeholder">Select a folder</div>
       </div>
     </div>
     <div class="col col-json">
@@ -461,10 +480,8 @@
         </button>
       </div>
       <div class="meta-panel" id="meta-panel">
-        <div class="meta-empty">No item selected</div>
       </div>
       <div class="col-body" id="json">
-        <div class="placeholder">Select a file or folder</div>
       </div>
     </div>
   </div>
@@ -581,78 +598,28 @@ document.getElementById("theme-toggle").addEventListener("click", () => {
 });
 
 // ============================================================
-// API configuration
+// API configuration — paths defined once here
 // ============================================================
+const ENDPOINTS = {
+  folders:   "/api/folders",
+  files:     "/api/files",
+  details:   "/api/details",
+  moveFile:  "/api/files/move",
+  copyFile:  "/api/files/copy",
+};
+
 const API = {
-  listFolders: (path) => `/api/folders?path=${encodeURIComponent(path)}`,
-  listFiles: (folderPath, offset, limit) =>
-    `/api/files?path=${encodeURIComponent(folderPath)}&offset=${offset}&limit=${limit}`,
-  itemDetails: (id) => `/api/details?id=${encodeURIComponent(id)}`,
-  createFolder: `/api/folders`,            // POST { parentPath, name, type, target? }
-  deleteFolder: (path) => `/api/folders?path=${encodeURIComponent(path)}`, // DELETE
-  deleteFile: (id) => `/api/files?id=${encodeURIComponent(id)}`,           // DELETE
-  moveFile: `/api/files/move`,             // POST { id, destPath }
-  copyFile: `/api/files/copy`,             // POST { id, destPath }
+  listFolders:  (path) => `${ENDPOINTS.folders}?path=${encodeURIComponent(path)}`,
+  listFiles:    (folderPath, offset, limit) =>
+    `${ENDPOINTS.files}?path=${encodeURIComponent(folderPath)}&offset=${offset}&limit=${limit}`,
+  itemDetails:  (id) => `${ENDPOINTS.details}?id=${encodeURIComponent(id)}`,
+  createFolder: ENDPOINTS.folders,
+  deleteFolder: (path) => `${ENDPOINTS.folders}?path=${encodeURIComponent(path)}`,
+  deleteFile:   (id) => `${ENDPOINTS.files}?id=${encodeURIComponent(id)}`,
+  moveFile:     ENDPOINTS.moveFile,
+  copyFile:     ENDPOINTS.copyFile,
 };
 const PAGE_SIZE = 100;
-const USE_MOCK = true;
-
-const mockTree = {
-  "": [
-    { id: "f:docs", name: "Documents", path: "docs", hasChildren: true },
-    { id: "f:pics", name: "Pictures", path: "pics", hasChildren: true },
-    { id: "f:proj", name: "Projects", path: "proj", hasChildren: true },
-    { id: "f:empty", name: "Empty", path: "empty", hasChildren: false },
-  ],
-  "docs": [
-    { id: "f:docs/work", name: "Work", path: "docs/work", hasChildren: true },
-    { id: "f:docs/personal", name: "Personal", path: "docs/personal", hasChildren: false },
-  ],
-  "docs/work": [
-    { id: "f:docs/work/2025", name: "2025", path: "docs/work/2025", hasChildren: false },
-    { id: "f:docs/work/2026", name: "2026", path: "docs/work/2026", hasChildren: false },
-  ],
-  "pics": [{ id: "f:pics/vac", name: "Vacations", path: "pics/vac", hasChildren: false }],
-  "proj": [
-    { id: "f:proj/vertx", name: "vertx-server", path: "proj/vertx", hasChildren: false },
-    { id: "f:proj/grpc", name: "grpc-demo", path: "proj/grpc", hasChildren: false },
-  ],
-};
-
-function mockFilesFor(path) {
-  const counts = { "docs": 12, "docs/work": 350, "docs/work/2025": 820,
-                   "docs/work/2026": 45, "docs/personal": 8, "pics": 5,
-                   "pics/vac": 1200, "proj/vertx": 230, "proj/grpc": 90 };
-  const n = counts[path] ?? 0;
-  const arr = [];
-  for (let i = 0; i < n; i++) {
-    const id = `file:${path}/${i}`;
-    if (mockDeletedFiles.has(id)) continue;
-    if (mockMovedFiles.has(id)) continue; // original location no longer has it
-    arr.push({
-      id,
-      name: `file-${String(i).padStart(5, "0")}.txt`,
-      size: Math.floor(Math.random() * 500000),
-      modified: new Date(Date.now() - i * 3600_000).toISOString(),
-      folder: path,
-    });
-  }
-  // Append files that have been moved/copied into this folder
-  for (const entry of mockExtraFiles.get(path) || []) {
-    if (mockDeletedFiles.has(entry.id)) continue;
-    arr.push(entry);
-  }
-  return arr;
-}
-
-// Mock mutation tracking
-const mockDeletedFiles = new Set();
-const mockMovedFiles = new Set();        // ids that have been moved away from their original folder
-const mockExtraFiles = new Map();        // folderPath -> [file, ...]
-function addExtraFile(path, file) {
-  if (!mockExtraFiles.has(path)) mockExtraFiles.set(path, []);
-  mockExtraFiles.get(path).push(file);
-}
 
 // ============================================================
 // Request log + timing
@@ -661,8 +628,9 @@ const requestLog = [];
 
 function describeUrl(url) {
   try {
-    const u = new URL(url, "http://mock");
-    const p = u.pathname.replace(/^\/api\//, "");
+    const u = new URL(url, location.origin);
+    const base = Object.values(ENDPOINTS)[0].replace(/\/[^/]+$/, "");
+    const p = u.pathname.startsWith(base) ? u.pathname.slice(base.length + 1) : u.pathname;
     const params = [];
     for (const [k, v] of u.searchParams) params.push(`${k}=${v}`);
     return params.length ? `${p}?${params.join("&")}` : p;
@@ -671,6 +639,7 @@ function describeUrl(url) {
 
 function updateStatusBar(entry) {
   const bar = document.getElementById("status-bar");
+  bar.classList.toggle("error", !entry.ok);
   const methodCls = entry.method.toLowerCase();
   const timingCls = entry.ms < 100 ? "fast" : entry.ms < 300 ? "med" : "slow";
   const resultCls = entry.ok ? "ok" : "fail";
@@ -681,7 +650,6 @@ function updateStatusBar(entry) {
     <span class="status-timing ${timingCls}">${entry.ms}ms</span>
     <button class="btn-timings" id="btn-timings">${requestLog.length} request${requestLog.length === 1 ? "" : "s"}</button>
   `;
-  // Re-attach since innerHTML replaced the button
   bar.querySelector("#btn-timings").addEventListener("click", openTimingsDialog);
 }
 
@@ -691,8 +659,9 @@ async function fetchJSON(url, options = {}) {
   const t0 = performance.now();
   let ok = true;
   try {
-    const result = await _fetchJSON(url, options);
-    return result;
+    const r = await fetch(url, options);
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    return await r.json();
   } catch (e) {
     ok = false;
     throw e;
@@ -710,118 +679,6 @@ async function fetchJSON(url, options = {}) {
     requestLog.push(entry);
     updateStatusBar(entry);
   }
-}
-
-async function _fetchJSON(url, options = {}) {
-  if (!USE_MOCK) {
-    const r = await fetch(url, options);
-    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-    return r.json();
-  }
-  await new Promise(r => setTimeout(r, 150));
-  const u = new URL(url, "http://mock");
-  const method = (options.method || "GET").toUpperCase();
-
-  if (method === "POST" && u.pathname === "/api/folders") {
-    const body = JSON.parse(options.body || "{}");
-    const parent = body.parentPath || "";
-    const name = (body.name || "").trim();
-    const type = body.type || "normal";
-    const target = body.target || null;
-    if (!name) throw new Error("Name required");
-    if (type === "symlink" && !target) throw new Error("Target required for symlinks");
-    const newPath = parent ? `${parent}/${name}` : name;
-    if (!mockTree[parent]) mockTree[parent] = [];
-    if (mockTree[parent].some(f => f.name === name)) throw new Error("Folder already exists");
-    const entry = { id: `f:${newPath}`, name, path: newPath, hasChildren: false, type };
-    if (type === "symlink") entry.target = target;
-    mockTree[parent].push(entry);
-    return entry;
-  }
-
-  if (method === "DELETE" && u.pathname === "/api/folders") {
-    const path = u.searchParams.get("path") || "";
-    if (!path) throw new Error("Cannot delete root");
-    const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
-    const name = path.includes("/") ? path.slice(path.lastIndexOf("/") + 1) : path;
-    const siblings = mockTree[parent] || [];
-    const idx = siblings.findIndex(f => f.name === name);
-    if (idx < 0) throw new Error("Folder not found");
-    siblings.splice(idx, 1);
-    // Clean up descendants in mockTree
-    for (const key of Object.keys(mockTree)) {
-      if (key === path || key.startsWith(path + "/")) delete mockTree[key];
-    }
-    return { ok: true };
-  }
-
-  if (method === "DELETE" && u.pathname === "/api/files") {
-    const id = u.searchParams.get("id") || "";
-    if (!id) throw new Error("id required");
-    mockDeletedFiles.add(id);
-    return { ok: true };
-  }
-
-  if (method === "POST" && (u.pathname === "/api/files/move" || u.pathname === "/api/files/copy")) {
-    const body = JSON.parse(options.body || "{}");
-    const id = body.id;
-    const destPath = body.destPath || "";
-    const isMove = u.pathname.endsWith("/move");
-    if (!id) throw new Error("id required");
-    // Validate destination exists in mock tree (or is root)
-    if (destPath !== "" && !Object.prototype.hasOwnProperty.call(mockTree, destPath)) {
-      // destPath is valid only if it appears in any parent's children list
-      const allPaths = new Set();
-      for (const kids of Object.values(mockTree)) kids.forEach(k => allPaths.add(k.path));
-      if (!allPaths.has(destPath)) throw new Error(`Destination folder not found: ${destPath}`);
-    }
-    // Synthesize the file name from the id
-    const name = id.split("/").pop().replace(/^(\d+)$/, m => `file-${String(m).padStart(5, "0")}.txt`);
-    const displayName = id.startsWith("file:") ? `file-${String(id.split("/").pop()).padStart(5, "0")}.txt` : name;
-    const newId = `${id}:${isMove ? "moved" : "copy"}:${Date.now()}`;
-    addExtraFile(destPath, {
-      id: newId,
-      name: displayName,
-      size: Math.floor(Math.random() * 500000),
-      modified: new Date().toISOString(),
-      folder: destPath,
-    });
-    if (isMove) mockMovedFiles.add(id);
-    return { ok: true, newId };
-  }
-
-  if (u.pathname === "/api/folders") {
-    return mockTree[u.searchParams.get("path") || ""] || [];
-  }
-
-
-  if (u.pathname === "/api/files") {
-    const path = u.searchParams.get("path") || "";
-    const offset = parseInt(u.searchParams.get("offset") || "0", 10);
-    const limit = parseInt(u.searchParams.get("limit") || "100", 10);
-    const all = mockFilesFor(path);
-    return { items: all.slice(offset, offset + limit), total: all.length };
-  }
-  if (u.pathname === "/api/details") {
-    const id = u.searchParams.get("id") || "";
-    return {
-      id, type: id.startsWith("f:") ? "folder" : "file",
-      name: id.split("/").pop(),
-      properties: {
-        created: "2026-01-15T10:00:00Z",
-        modified: new Date().toISOString(),
-        size: id.startsWith("f:") ? null : Math.floor(Math.random() * 1_000_000),
-        permissions: ["read", "write"],
-        tags: ["sample", "demo"],
-      },
-      metadata: {
-        owner: "matthew",
-        group: "staff",
-        nested: { deep: { value: 42, list: [1, 2, 3] } }
-      }
-    };
-  }
-  return null;
 }
 
 // ============================================================
@@ -859,7 +716,7 @@ async function renderTreeChildren(container, parentPath) {
     }
     folders.forEach(f => container.appendChild(createTreeNode(f)));
   } catch (e) {
-    container.innerHTML = `<div class="tree-empty error">Error: ${e.message}</div>`;
+    container.innerHTML = "";
   }
 }
 
@@ -992,8 +849,7 @@ async function loadNextFilePage() {
       filesEl.appendChild(end);
     }
   } catch (e) {
-    loader.textContent = `Error: ${e.message}`;
-    loader.classList.add("error");
+    loader.remove();
   } finally {
     fileState.loading = false;
   }
@@ -1129,8 +985,8 @@ async function loadDetails(id) {
     jsonEl.appendChild(renderJSON(data));
     renderMetadata(data);
   } catch (e) {
-    jsonEl.innerHTML = `<div class="placeholder error">Error: ${e.message}</div>`;
-    metaPanel.innerHTML = `<div class="meta-empty">Error: ${e.message}</div>`;
+    jsonEl.innerHTML = "";
+    metaPanel.innerHTML = "";
   }
 }
 
@@ -1455,9 +1311,9 @@ deleteFolderBtn.addEventListener("click", () => {
       deleteFolderBtn.disabled = true;
       newFolderBtn.disabled = true;
       // Clear downstream panels
-      filesEl.innerHTML = '<div class="placeholder">Select a folder</div>';
+      filesEl.innerHTML = '';
       filesHeader.textContent = "Files";
-      jsonEl.innerHTML = '<div class="placeholder">Select a file or folder</div>';
+      jsonEl.innerHTML = '';
       fileState = null;
       selectedFile = null;
       setFileButtonsEnabled(false);
@@ -1479,7 +1335,7 @@ deleteFileBtn.addEventListener("click", () => {
       selectedFile = null;
       selectedFileRow = null;
       setFileButtonsEnabled(false);
-      jsonEl.innerHTML = '<div class="placeholder">Select a file or folder</div>';
+      jsonEl.innerHTML = '';
       if (fileState) fileState.offset = Math.max(0, fileState.offset - 1);
     }
   });
@@ -1505,7 +1361,7 @@ moveFileBtn.addEventListener("click", () => {
       selectedFile = null;
       selectedFileRow = null;
       setFileButtonsEnabled(false);
-      jsonEl.innerHTML = '<div class="placeholder">Select a file or folder</div>';
+      jsonEl.innerHTML = '';
     }
   });
 });
@@ -1575,6 +1431,7 @@ document.getElementById("timings-clear").addEventListener("click", () => {
   timingsBody.innerHTML = "";
   timingsStats.textContent = "No requests recorded.";
   const bar = document.getElementById("status-bar");
+  bar.classList.remove("error");
   bar.innerHTML = '<span class="status-idle">No requests yet</span><button class="btn-timings" id="btn-timings">Timings</button>';
   bar.querySelector("#btn-timings").addEventListener("click", openTimingsDialog);
 });
