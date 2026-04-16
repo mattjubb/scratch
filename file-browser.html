@@ -364,6 +364,24 @@
   :root[data-theme="dark"] .status-result.ok   { color: #4ade80; }
   :root[data-theme="dark"] .status-result.fail { color: #f87171; }
   .status-idle { color: var(--text-faint); font-style: italic; font-family: inherit; }
+
+  /* Loading state */
+  .status-bar.loading { color: var(--text); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-spinner {
+    display: inline-block; width: 12px; height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--text-muted);
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    flex-shrink: 0;
+  }
+  .status-elapsed {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    min-width: 48px;
+    color: var(--text-muted);
+  }
   .status-bar.error {
     background: #fef2f2; border-top-color: #fca5a5;
     color: #991b1b;
@@ -639,6 +657,7 @@ function describeUrl(url) {
 
 function updateStatusBar(entry) {
   const bar = document.getElementById("status-bar");
+  bar.classList.remove("loading");
   bar.classList.toggle("error", !entry.ok);
   const methodCls = entry.method.toLowerCase();
   const timingCls = entry.ms < 100 ? "fast" : entry.ms < 300 ? "med" : "slow";
@@ -653,11 +672,41 @@ function updateStatusBar(entry) {
   bar.querySelector("#btn-timings").addEventListener("click", openTimingsDialog);
 }
 
+let _loadingTimer = null;
+
+function showLoadingStatus(method, desc) {
+  const bar = document.getElementById("status-bar");
+  bar.classList.remove("error");
+  bar.classList.add("loading");
+  const methodCls = method.toLowerCase();
+  const t0 = performance.now();
+  bar.innerHTML = `
+    <span class="status-spinner"></span>
+    <span class="status-method ${methodCls}">${method}</span>
+    <span class="status-url">${desc}</span>
+    <span class="status-elapsed" id="status-elapsed">0ms</span>
+    <button class="btn-timings" id="btn-timings">${requestLog.length} request${requestLog.length === 1 ? "" : "s"}</button>
+  `;
+  bar.querySelector("#btn-timings").addEventListener("click", openTimingsDialog);
+  const el = document.getElementById("status-elapsed");
+  clearInterval(_loadingTimer);
+  _loadingTimer = setInterval(() => {
+    if (el.isConnected) el.textContent = `${Math.round(performance.now() - t0)}ms`;
+    else clearInterval(_loadingTimer);
+  }, 16);
+}
+
+function stopLoadingTimer() {
+  clearInterval(_loadingTimer);
+  _loadingTimer = null;
+}
+
 async function fetchJSON(url, options = {}) {
   const method = (options.method || "GET").toUpperCase();
   const desc = describeUrl(url);
   const t0 = performance.now();
   let ok = true;
+  showLoadingStatus(method, desc);
   try {
     const r = await fetch(url, options);
     if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
@@ -666,6 +715,7 @@ async function fetchJSON(url, options = {}) {
     ok = false;
     throw e;
   } finally {
+    stopLoadingTimer();
     const ms = Math.round(performance.now() - t0);
     const entry = {
       id: requestLog.length + 1,
@@ -706,37 +756,41 @@ let selectedFolder = null;  // { path, name, node }
 let selectedFile = null;    // { id, name, row, item }
 
 async function renderTreeChildren(container, parentPath) {
-  container.innerHTML = '<div class="tree-loading">Loading…</div>';
   try {
-    const folders = await fetchJSON(API.listFolders(parentPath));
+    const paths = await fetchJSON(API.listFolders(parentPath));
     container.innerHTML = "";
-    if (!folders.length) {
+    if (!paths.length) {
       container.innerHTML = '<div class="tree-empty">(empty)</div>';
       return;
     }
-    folders.forEach(f => container.appendChild(createTreeNode(f)));
+    paths.forEach(p => container.appendChild(createTreeNode(p)));
   } catch (e) {
     container.innerHTML = "";
   }
 }
 
-function createTreeNode(folder) {
+function createTreeNode(folderPath) {
+  // folderPath is a full path string like "/one/two"
+  const name = folderPath.split("/").filter(Boolean).pop() || folderPath;
+  const path = folderPath;
+
   const node = document.createElement("div");
   node.className = "tree-node";
   node.dataset.loaded = "false";
-  node.dataset.path = folder.path;
+  node.dataset.path = path;
 
   const row = document.createElement("div");
   row.className = "tree-row";
 
+  // All folders are expandable — we discover emptiness on expand
   const toggle = document.createElement("span");
-  toggle.className = "tree-toggle" + (folder.hasChildren ? "" : " empty");
+  toggle.className = "tree-toggle";
   toggle.appendChild(iconEl(ICONS.chevron));
 
   const icon = iconEl(ICONS.folder);
 
   const label = document.createElement("span");
-  label.textContent = folder.name;
+  label.textContent = name;
 
   row.appendChild(toggle);
   row.appendChild(icon);
@@ -749,22 +803,19 @@ function createTreeNode(folder) {
   node.appendChild(row);
   node.appendChild(children);
 
-  // Store refs for later (create-folder insertion + expansion)
-  node._folder = folder;
+  node._folder = { path, name };
   node._children = children;
   node._toggle = toggle;
   node._iconEl = icon;
 
   const expand = async () => {
-    if (!folder.hasChildren) return;
     node.classList.add("expanded");
-    // Swap icon to open variant
     const newIcon = iconEl(ICONS.folderOpen);
     node._iconEl.replaceWith(newIcon);
     node._iconEl = newIcon;
     if (node.dataset.loaded === "false") {
       node.dataset.loaded = "true";
-      await renderTreeChildren(children, folder.path);
+      await renderTreeChildren(children, path);
     }
   };
   const collapse = () => {
@@ -777,7 +828,6 @@ function createTreeNode(folder) {
 
   toggle.addEventListener("click", async (e) => {
     e.stopPropagation();
-    if (!folder.hasChildren) return;
     if (node.classList.contains("expanded")) collapse();
     else await expand();
   });
@@ -786,13 +836,14 @@ function createTreeNode(folder) {
     if (selectedTreeRow) selectedTreeRow.classList.remove("selected");
     row.classList.add("selected");
     selectedTreeRow = row;
-    selectedFolder = { path: folder.path, name: folder.name, node };
+    selectedFolder = { path, name, node };
     newFolderBtn.disabled = false;
-    newFolderBtn.title = `New folder in ${folder.path || "/"}`;
+    newFolderBtn.title = `New folder in ${path || "/"}`;
     deleteFolderBtn.disabled = false;
-    deleteFolderBtn.title = `Delete ${folder.path}`;
-    loadFiles(folder.path, folder.name);
-    loadDetails(folder.id);
+    deleteFolderBtn.title = `Delete ${path}`;
+    loadFiles(path, name);
+    jsonEl.innerHTML = "";
+    metaPanel.innerHTML = "";
   });
 
   return node;
@@ -819,14 +870,8 @@ async function loadNextFilePage() {
   if (!fileState || fileState.loading || fileState.done) return;
   fileState.loading = true;
 
-  const loader = document.createElement("div");
-  loader.className = "loader";
-  loader.textContent = "Loading…";
-  filesEl.appendChild(loader);
-
   try {
     const res = await fetchJSON(API.listFiles(fileState.path, fileState.offset, PAGE_SIZE));
-    loader.remove();
 
     const items = res.items || [];
     fileState.total = res.total ?? fileState.total;
@@ -849,7 +894,7 @@ async function loadNextFilePage() {
       filesEl.appendChild(end);
     }
   } catch (e) {
-    loader.remove();
+    // error shown in status bar
   } finally {
     fileState.loading = false;
   }
@@ -977,8 +1022,6 @@ function emptyMeta(text) {
 }
 
 async function loadDetails(id) {
-  jsonEl.innerHTML = '<div class="placeholder">Loading…</div>';
-  metaPanel.innerHTML = '<div class="meta-empty">Loading…</div>';
   try {
     const data = await fetchJSON(API.itemDetails(id));
     jsonEl.innerHTML = "";
@@ -1181,9 +1224,11 @@ async function doCreate() {
       body: JSON.stringify(payload),
     });
 
-    // Update tree: make parent expandable if it wasn't, expand it, insert child
+    // Build the new folder's full path
+    const newPath = parentPath ? `${parentPath}/${name}` : `/${name}`;
+
+    // Update tree: expand parent, insert child
     const parentNode = selectedFolder.node;
-    parentNode._folder.hasChildren = true;
     parentNode._toggle.classList.remove("empty");
 
     if (parentNode.dataset.loaded === "false") {
@@ -1192,7 +1237,7 @@ async function doCreate() {
     } else {
       const empty = parentNode._children.querySelector(".tree-empty");
       if (empty) empty.remove();
-      parentNode._children.appendChild(createTreeNode(created));
+      parentNode._children.appendChild(createTreeNode(newPath));
     }
 
     if (!parentNode.classList.contains("expanded")) {
@@ -1431,7 +1476,8 @@ document.getElementById("timings-clear").addEventListener("click", () => {
   timingsBody.innerHTML = "";
   timingsStats.textContent = "No requests recorded.";
   const bar = document.getElementById("status-bar");
-  bar.classList.remove("error");
+  bar.classList.remove("error", "loading");
+  stopLoadingTimer();
   bar.innerHTML = '<span class="status-idle">No requests yet</span><button class="btn-timings" id="btn-timings">Timings</button>';
   bar.querySelector("#btn-timings").addEventListener("click", openTimingsDialog);
 });
