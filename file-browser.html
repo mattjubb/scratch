@@ -280,6 +280,25 @@
   .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
   .file-size { color: var(--text-muted); font-size: 11px; margin-left: 10px; flex-shrink: 0; }
 
+  .col-filter-bar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 10px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .col-filter-bar input {
+    flex: 1; padding: 3px 6px;
+    font-size: 12px; font-family: "SF Mono", Menlo, Consolas, monospace;
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: 4px; outline: none;
+  }
+  .col-filter-bar input:focus { border-color: #7aa8e0; box-shadow: 0 0 0 2px rgba(122,168,224,.25); }
+  /* hide number spinners */
+  .col-filter-bar input::-webkit-outer-spin-button,
+  .col-filter-bar input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .col-filter-bar input[type=number] { -moz-appearance: textfield; }
+
   .loader, .empty-state {
     padding: 14px;
     text-align: center;
@@ -470,6 +489,12 @@
           </button>
         </div>
       </div>
+      <div class="col-filter-bar">
+        <input type="text" id="jump-folder" placeholder="go to folder…" autocomplete="off" spellcheck="false">
+        <button class="btn btn-icon-only" id="btn-jump-folder" title="Go to folder">
+          <svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
       <div class="col-body" id="tree"></div>
     </div>
     <div class="col col-files">
@@ -487,15 +512,29 @@
           </button>
         </div>
       </div>
+      <div class="col-filter-bar">
+        <input type="number" id="jump-offset" min="0" step="1" placeholder="jump to…" autocomplete="off">
+        <button class="btn btn-icon-only" id="btn-jump" title="Go to offset">
+          <svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
       <div class="col-body" id="files">
       </div>
     </div>
     <div class="col col-json">
       <div class="col-header">
         <span>Details</span>
-        <button class="btn btn-icon-only" id="btn-toggle-meta" title="Show metadata">
-          <svg class="icon icon-chevron" id="meta-chevron" viewBox="0 0 24 24" style="transform:rotate(90deg)"><polyline points="9 6 15 12 9 18"/></svg>
-        </button>
+        <div class="header-actions">
+          <button class="btn btn-icon-only" id="btn-download-json" disabled title="Download JSON">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
+          <button class="btn btn-icon-only" id="btn-toggle-meta" title="Show metadata">
+            <svg class="icon icon-chevron" id="meta-chevron" viewBox="0 0 24 24" style="transform:rotate(90deg)"><polyline points="9 6 15 12 9 18"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="col-filter-bar">
+        <input type="text" id="json-filter" placeholder="filter json…" autocomplete="off" spellcheck="false">
       </div>
       <div class="meta-panel" id="meta-panel">
       </div>
@@ -842,8 +881,7 @@ function createTreeNode(folderPath) {
     deleteFolderBtn.disabled = false;
     deleteFolderBtn.title = `Delete ${path}`;
     loadFiles(path, name);
-    jsonEl.innerHTML = "";
-    metaPanel.innerHTML = "";
+    clearDetailsPanel();
   });
 
   return node;
@@ -854,17 +892,40 @@ function createTreeNode(folderPath) {
 // ============================================================
 const filesEl = document.getElementById("files");
 const filesHeader = document.getElementById("files-header");
+const jumpOffsetInput = document.getElementById("jump-offset");
+const btnJump = document.getElementById("btn-jump");
 let fileState = null;
 
 function loadFiles(path, displayName) {
   filesHeader.textContent = `Files — ${displayName || path || "root"}`;
   filesEl.innerHTML = "";
+  jumpOffsetInput.value = "";
   fileState = { path, offset: 0, total: null, loading: false, done: false };
   selectedFile = null;
   selectedFileRow = null;
   setFileButtonsEnabled(false);
   loadNextFilePage();
 }
+
+function jumpToOffset() {
+  if (!fileState) return;
+  const val = parseInt(jumpOffsetInput.value, 10);
+  if (isNaN(val) || val < 0) return;
+  filesEl.innerHTML = "";
+  fileState.offset = val;
+  fileState.done = false;
+  fileState.loading = false;
+  fileState.total = null;
+  selectedFile = null;
+  selectedFileRow = null;
+  setFileButtonsEnabled(false);
+  loadNextFilePage();
+}
+
+btnJump.addEventListener("click", jumpToOffset);
+jumpOffsetInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") jumpToOffset();
+});
 
 async function loadNextFilePage() {
   if (!fileState || fileState.loading || fileState.done) return;
@@ -953,6 +1014,16 @@ const metaPanel = document.getElementById("meta-panel");
 const metaToggleBtn = document.getElementById("btn-toggle-meta");
 const metaChevron = document.getElementById("meta-chevron");
 
+function clearDetailsPanel() {
+  jsonEl.innerHTML = "";
+  metaPanel.innerHTML = "";
+  currentDetailsData = null;
+  const dl = document.getElementById("btn-download-json");
+  if (dl) dl.disabled = true;
+  const fi = document.getElementById("json-filter");
+  if (fi) fi.value = "";
+}
+
 metaToggleBtn.addEventListener("click", () => {
   const open = metaPanel.classList.toggle("open");
   metaChevron.style.transform = open ? "rotate(-90deg)" : "rotate(90deg)";
@@ -1024,14 +1095,98 @@ function emptyMeta(text) {
 async function loadDetails(id) {
   try {
     const data = await fetchJSON(API.itemDetails(id));
+    currentDetailsData = data;
+    jsonFilterInput.value = "";
+    btnDownloadJson.disabled = false;
     jsonEl.innerHTML = "";
     jsonEl.appendChild(renderJSON(data));
     renderMetadata(data);
   } catch (e) {
+    currentDetailsData = null;
+    btnDownloadJson.disabled = true;
     jsonEl.innerHTML = "";
     metaPanel.innerHTML = "";
   }
 }
+
+// ============================================================
+// JSON filter
+// ============================================================
+let currentDetailsData = null;
+const jsonFilterInput = document.getElementById("json-filter");
+const btnDownloadJson = document.getElementById("btn-download-json");
+
+function filterJSON(obj, term) {
+  if (obj === null || obj === undefined) return matchesTerm(String(obj), term) ? obj : undefined;
+  if (typeof obj !== "object") return matchesTerm(String(obj), term) ? obj : undefined;
+
+  if (Array.isArray(obj)) {
+    const filtered = [];
+    for (const item of obj) {
+      const r = filterJSON(item, term);
+      if (r !== undefined) filtered.push(r);
+    }
+    return filtered.length ? filtered : undefined;
+  }
+
+  const result = {};
+  let hasMatch = false;
+  for (const [k, v] of Object.entries(obj)) {
+    if (matchesTerm(k, term)) {
+      result[k] = v; // key matches — include entire value
+      hasMatch = true;
+    } else {
+      const r = filterJSON(v, term);
+      if (r !== undefined) {
+        result[k] = r;
+        hasMatch = true;
+      }
+    }
+  }
+  return hasMatch ? result : undefined;
+}
+
+function matchesTerm(text, term) {
+  return text.toLowerCase().includes(term);
+}
+
+function applyJsonFilter() {
+  if (!currentDetailsData) return;
+  const term = jsonFilterInput.value.trim().toLowerCase();
+  jsonEl.innerHTML = "";
+  if (!term) {
+    jsonEl.appendChild(renderJSON(currentDetailsData));
+    return;
+  }
+  const filtered = filterJSON(currentDetailsData, term);
+  if (filtered !== undefined) {
+    jsonEl.appendChild(renderJSON(filtered));
+  } else {
+    const msg = document.createElement("div");
+    msg.className = "empty-state";
+    msg.textContent = "No matches";
+    jsonEl.appendChild(msg);
+  }
+}
+
+jsonFilterInput.addEventListener("input", applyJsonFilter);
+
+// ============================================================
+// Download JSON
+// ============================================================
+btnDownloadJson.addEventListener("click", () => {
+  if (!currentDetailsData) return;
+  const json = JSON.stringify(currentDetailsData, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "details.json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
 
 function renderJSON(value) {
   const wrap = document.createElement("div");
@@ -1358,7 +1513,7 @@ deleteFolderBtn.addEventListener("click", () => {
       // Clear downstream panels
       filesEl.innerHTML = '';
       filesHeader.textContent = "Files";
-      jsonEl.innerHTML = '';
+      clearDetailsPanel();
       fileState = null;
       selectedFile = null;
       setFileButtonsEnabled(false);
@@ -1380,7 +1535,7 @@ deleteFileBtn.addEventListener("click", () => {
       selectedFile = null;
       selectedFileRow = null;
       setFileButtonsEnabled(false);
-      jsonEl.innerHTML = '';
+      clearDetailsPanel();
       if (fileState) fileState.offset = Math.max(0, fileState.offset - 1);
     }
   });
@@ -1406,7 +1561,7 @@ moveFileBtn.addEventListener("click", () => {
       selectedFile = null;
       selectedFileRow = null;
       setFileButtonsEnabled(false);
-      jsonEl.innerHTML = '';
+      clearDetailsPanel();
     }
   });
 });
@@ -1484,6 +1639,92 @@ document.getElementById("timings-clear").addEventListener("click", () => {
 
 // Initial button wiring
 document.getElementById("btn-timings").addEventListener("click", openTimingsDialog);
+
+// ============================================================
+// Jump to folder
+// ============================================================
+const jumpFolderInput = document.getElementById("jump-folder");
+const btnJumpFolder = document.getElementById("btn-jump-folder");
+
+async function jumpToFolder() {
+  let target = jumpFolderInput.value.trim();
+  if (!target) return;
+  // Normalise: ensure leading slash, strip trailing slash
+  if (!target.startsWith("/")) target = "/" + target;
+  target = target.replace(/\/+$/, "") || "/";
+
+  // Build ancestor chain: "/a/b/c" → ["", "/a", "/a/b", "/a/b/c"]
+  const segments = target.split("/").filter(Boolean);
+  const chain = [""];
+  let acc = "";
+  for (const seg of segments) {
+    acc += "/" + seg;
+    chain.push(acc);
+  }
+
+  // Clear tree and reload from root, expanding each ancestor
+  treeEl.innerHTML = "";
+  selectedTreeRow = null;
+  selectedFolder = null;
+  newFolderBtn.disabled = true;
+  deleteFolderBtn.disabled = true;
+
+  let container = treeEl;
+  let targetNode = null;
+
+  for (let i = 0; i < chain.length; i++) {
+    const parentPath = chain[i];
+    await renderTreeChildren(container, parentPath);
+
+    // If there's a next level, find the matching child node and expand it
+    if (i < chain.length - 1) {
+      const nextPath = chain[i + 1];
+      const childNode = [...container.querySelectorAll(":scope > .tree-node")].find(
+        n => n.dataset.path === nextPath
+      );
+      if (!childNode) break; // path doesn't exist on server
+      if (i === chain.length - 2) targetNode = childNode;
+      childNode.classList.add("expanded");
+      const newIcon = iconEl(ICONS.folderOpen);
+      childNode._iconEl.replaceWith(newIcon);
+      childNode._iconEl = newIcon;
+      childNode.dataset.loaded = "true";
+      container = childNode._children;
+    }
+  }
+
+  // Select the target folder
+  if (targetNode) {
+    const row = targetNode.querySelector(":scope > .tree-row");
+    if (row) {
+      if (selectedTreeRow) selectedTreeRow.classList.remove("selected");
+      row.classList.add("selected");
+      selectedTreeRow = row;
+    }
+    const name = targetNode._folder.name;
+    const path = targetNode._folder.path;
+    selectedFolder = { path, name, node: targetNode };
+    newFolderBtn.disabled = false;
+    newFolderBtn.title = `New folder in ${path}`;
+    deleteFolderBtn.disabled = false;
+    deleteFolderBtn.title = `Delete ${path}`;
+    loadFiles(path, name);
+    // Load children if not already done
+    if (targetNode.dataset.loaded === "false") {
+      targetNode.dataset.loaded = "true";
+      targetNode.classList.add("expanded");
+      const newIcon = iconEl(ICONS.folderOpen);
+      targetNode._iconEl.replaceWith(newIcon);
+      targetNode._iconEl = newIcon;
+      await renderTreeChildren(targetNode._children, path);
+    }
+  }
+}
+
+btnJumpFolder.addEventListener("click", jumpToFolder);
+jumpFolderInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") jumpToFolder();
+});
 
 renderTreeChildren(treeEl, "");
 </script>
