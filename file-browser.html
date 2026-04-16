@@ -323,6 +323,90 @@
   .col-body::-webkit-scrollbar-track { background: transparent; }
   .col-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
   .col-body::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+
+  /* Status bar */
+  .status-bar {
+    display: flex; align-items: center;
+    padding: 3px 10px;
+    background: var(--surface-2);
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    gap: 10px;
+    min-height: 24px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .status-method {
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    letter-spacing: .3px;
+  }
+  .status-method.get    { color: #16a34a; background: rgba(22,163,74,.1); }
+  .status-method.post   { color: #2563eb; background: rgba(37,99,235,.1); }
+  .status-method.delete { color: #dc2626; background: rgba(220,38,38,.1); }
+  :root[data-theme="dark"] .status-method.get    { color: #4ade80; background: rgba(74,222,128,.12); }
+  :root[data-theme="dark"] .status-method.post   { color: #60a5fa; background: rgba(96,165,250,.12); }
+  :root[data-theme="dark"] .status-method.delete { color: #f87171; background: rgba(248,113,113,.12); }
+  .status-url { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .status-timing { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .status-timing.fast  { color: #16a34a; }
+  .status-timing.med   { color: #ca8a04; }
+  .status-timing.slow  { color: #dc2626; }
+  :root[data-theme="dark"] .status-timing.fast { color: #4ade80; }
+  :root[data-theme="dark"] .status-timing.med  { color: #facc15; }
+  :root[data-theme="dark"] .status-timing.slow { color: #f87171; }
+  .status-result { font-size: 10px; }
+  .status-result.ok   { color: #16a34a; }
+  .status-result.fail { color: #dc2626; }
+  :root[data-theme="dark"] .status-result.ok   { color: #4ade80; }
+  :root[data-theme="dark"] .status-result.fail { color: #f87171; }
+  .status-idle { color: var(--text-faint); font-style: italic; font-family: inherit; }
+
+  .btn-timings {
+    padding: 2px 6px; font-size: 10px; font-weight: 600;
+    background: transparent; border: 1px solid var(--border);
+    border-radius: 3px; color: var(--text-faint);
+    cursor: pointer; font-family: inherit; letter-spacing: .3px;
+    margin-left: auto; flex-shrink: 0;
+  }
+  .btn-timings:hover { color: var(--text-muted); border-color: var(--text-faint); background: var(--surface); }
+
+  /* Timings dialog */
+  .timings-dialog { max-width: 720px; width: 90vw; max-height: 70vh; display: flex; flex-direction: column; }
+  .timings-dialog h3 { margin-bottom: 4px; }
+  .timings-stats { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .timings-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+  .timings-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 11px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .timings-table th {
+    text-align: left; padding: 5px 8px;
+    font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
+    color: var(--text-muted); font-weight: 600;
+    border-bottom: 2px solid var(--border);
+    position: sticky; top: 0; background: var(--surface);
+  }
+  .timings-table td {
+    padding: 4px 8px; border-bottom: 1px solid var(--border-subtle);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 280px;
+  }
+  .timings-table tr:hover td { background: var(--hover); }
+  .timings-table .col-idx { width: 30px; color: var(--text-faint); text-align: right; }
+  .timings-table .col-time { color: var(--text-faint); width: 75px; }
+  .timings-table .col-method { width: 55px; }
+  .timings-table .col-ms { width: 60px; text-align: right; font-variant-numeric: tabular-nums; }
+  .timings-clear {
+    font-size: 11px; padding: 3px 8px; cursor: pointer;
+    background: transparent; border: 1px solid var(--border); border-radius: 3px;
+    color: var(--text-muted); font-family: inherit;
+  }
+  .timings-clear:hover { color: var(--text); border-color: var(--text-faint); }
 </style>
 </head>
 <body>
@@ -383,6 +467,34 @@
         <div class="placeholder">Select a file or folder</div>
       </div>
     </div>
+  </div>
+  <div class="status-bar" id="status-bar">
+    <span class="status-idle">No requests yet</span>
+    <button class="btn-timings" id="btn-timings">Timings</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="timings-modal">
+  <div class="modal timings-dialog">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+      <h3>Request Log</h3>
+      <button class="timings-clear" id="timings-clear">Clear</button>
+    </div>
+    <div class="timings-stats" id="timings-stats"></div>
+    <div class="timings-scroll">
+      <table class="timings-table">
+        <thead><tr>
+          <th class="col-idx">#</th>
+          <th class="col-time">Time</th>
+          <th class="col-method">Method</th>
+          <th>URL</th>
+          <th class="col-ms">ms</th>
+          <th>Status</th>
+        </tr></thead>
+        <tbody id="timings-body"></tbody>
+      </table>
+    </div>
+    <div class="modal-actions"><button class="btn" id="timings-close">Close</button></div>
   </div>
 </div>
 
@@ -542,7 +654,65 @@ function addExtraFile(path, file) {
   mockExtraFiles.get(path).push(file);
 }
 
+// ============================================================
+// Request log + timing
+// ============================================================
+const requestLog = [];
+
+function describeUrl(url) {
+  try {
+    const u = new URL(url, "http://mock");
+    const p = u.pathname.replace(/^\/api\//, "");
+    const params = [];
+    for (const [k, v] of u.searchParams) params.push(`${k}=${v}`);
+    return params.length ? `${p}?${params.join("&")}` : p;
+  } catch { return url; }
+}
+
+function updateStatusBar(entry) {
+  const bar = document.getElementById("status-bar");
+  const methodCls = entry.method.toLowerCase();
+  const timingCls = entry.ms < 100 ? "fast" : entry.ms < 300 ? "med" : "slow";
+  const resultCls = entry.ok ? "ok" : "fail";
+  bar.innerHTML = `
+    <span class="status-method ${methodCls}">${entry.method}</span>
+    <span class="status-url" title="${entry.url}">${entry.desc}</span>
+    <span class="status-result ${resultCls}">${entry.ok ? "OK" : "ERR"}</span>
+    <span class="status-timing ${timingCls}">${entry.ms}ms</span>
+    <button class="btn-timings" id="btn-timings">${requestLog.length} request${requestLog.length === 1 ? "" : "s"}</button>
+  `;
+  // Re-attach since innerHTML replaced the button
+  bar.querySelector("#btn-timings").addEventListener("click", openTimingsDialog);
+}
+
 async function fetchJSON(url, options = {}) {
+  const method = (options.method || "GET").toUpperCase();
+  const desc = describeUrl(url);
+  const t0 = performance.now();
+  let ok = true;
+  try {
+    const result = await _fetchJSON(url, options);
+    return result;
+  } catch (e) {
+    ok = false;
+    throw e;
+  } finally {
+    const ms = Math.round(performance.now() - t0);
+    const entry = {
+      id: requestLog.length + 1,
+      time: new Date(),
+      method,
+      url,
+      desc,
+      ms,
+      ok,
+    };
+    requestLog.push(entry);
+    updateStatusBar(entry);
+  }
+}
+
+async function _fetchJSON(url, options = {}) {
   if (!USE_MOCK) {
     const r = await fetch(url, options);
     if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
@@ -1359,6 +1529,58 @@ copyFileBtn.addEventListener("click", () => {
     }
   });
 });
+
+// ============================================================
+// Timings dialog
+// ============================================================
+const timingsModal = document.getElementById("timings-modal");
+const timingsBody  = document.getElementById("timings-body");
+const timingsStats = document.getElementById("timings-stats");
+
+function openTimingsDialog() {
+  // Rebuild table rows
+  timingsBody.innerHTML = "";
+  for (const e of requestLog) {
+    const tr = document.createElement("tr");
+    const methodCls = e.method.toLowerCase();
+    const timingCls = e.ms < 100 ? "fast" : e.ms < 300 ? "med" : "slow";
+    tr.innerHTML = `
+      <td class="col-idx">${e.id}</td>
+      <td class="col-time">${e.time.toLocaleTimeString()}</td>
+      <td class="col-method"><span class="status-method ${methodCls}">${e.method}</span></td>
+      <td title="${e.url}">${e.desc}</td>
+      <td class="col-ms"><span class="status-timing ${timingCls}">${e.ms}</span></td>
+      <td><span class="status-result ${e.ok ? "ok" : "fail"}">${e.ok ? "OK" : "ERR"}</span></td>
+    `;
+    timingsBody.appendChild(tr);
+  }
+  // Summary stats
+  if (requestLog.length) {
+    const times = requestLog.map(e => e.ms);
+    const avg = Math.round(times.reduce((a, b) => a + b, 0) / times.length);
+    const min = Math.min(...times);
+    const max = Math.max(...times);
+    const errs = requestLog.filter(e => !e.ok).length;
+    timingsStats.textContent = `${requestLog.length} requests  ·  avg ${avg}ms  ·  min ${min}ms  ·  max ${max}ms${errs ? `  ·  ${errs} error${errs > 1 ? "s" : ""}` : ""}`;
+  } else {
+    timingsStats.textContent = "No requests recorded.";
+  }
+  timingsModal.classList.add("open");
+}
+
+document.getElementById("timings-close").addEventListener("click", () => timingsModal.classList.remove("open"));
+timingsModal.addEventListener("click", (e) => { if (e.target === timingsModal) timingsModal.classList.remove("open"); });
+document.getElementById("timings-clear").addEventListener("click", () => {
+  requestLog.length = 0;
+  timingsBody.innerHTML = "";
+  timingsStats.textContent = "No requests recorded.";
+  const bar = document.getElementById("status-bar");
+  bar.innerHTML = '<span class="status-idle">No requests yet</span><button class="btn-timings" id="btn-timings">Timings</button>';
+  bar.querySelector("#btn-timings").addEventListener("click", openTimingsDialog);
+});
+
+// Initial button wiring
+document.getElementById("btn-timings").addEventListener("click", openTimingsDialog);
 
 renderTreeChildren(treeEl, "");
 </script>
