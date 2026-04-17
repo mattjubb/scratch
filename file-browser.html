@@ -2,7 +2,7 @@
 <html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
-<title>File Browser</title>
+<title>Key Browser</title>
 <style>
   :root[data-theme="light"] {
     --bg: #f5f5f5;
@@ -94,7 +94,7 @@
   }
   .col:last-child { border-right: none; }
   .col-tree  { width: 25%; }
-  .col-files { width: 25%; }
+  .col-keys { width: 25%; }
   .col-json  { width: 50%; }
 
   .col-header {
@@ -123,7 +123,7 @@
     flex-shrink: 0; vertical-align: middle;
   }
   .icon-folder  { color: #e8a33d; }
-  .icon-file    { color: var(--text-muted); }
+  .icon-key    { color: var(--text-muted); }
   .icon-chevron { color: var(--text-muted); width: 12px; height: 12px; transition: transform .12s ease; }
   .tree-node.expanded > .tree-row .icon-chevron { transform: rotate(90deg); }
 
@@ -265,7 +265,7 @@
     font-style: italic;
   }
 
-  .file-row {
+  .key-row {
     display: flex;
     align-items: center;
     padding: 7px 14px;
@@ -274,11 +274,11 @@
     white-space: nowrap;
     overflow: hidden;
   }
-  .file-row:hover { background: var(--hover); }
-  .file-row.selected { background: var(--accent-bg); }
-  .file-icon { margin-right: 10px; flex-shrink: 0; }
-  .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
-  .file-size { color: var(--text-muted); font-size: 11px; margin-left: 10px; flex-shrink: 0; }
+  .key-row:hover { background: var(--hover); }
+  .key-row.selected { background: var(--accent-bg); }
+  .key-icon { margin-right: 10px; flex-shrink: 0; }
+  .key-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .key-size { color: var(--text-muted); font-size: 11px; margin-left: 10px; flex-shrink: 0; }
 
   .col-filter-bar {
     display: flex; align-items: center; gap: 6px;
@@ -469,7 +469,7 @@
 <body>
 <div class="app">
   <div class="toolbar">
-    <div class="toolbar-title">File Browser</div>
+    <div class="toolbar-title">Key Browser</div>
     <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
       <span id="theme-icon-slot"></span>
       <span id="theme-label">Dark</span>
@@ -497,17 +497,17 @@
       </div>
       <div class="col-body" id="tree"></div>
     </div>
-    <div class="col col-files">
+    <div class="col col-keys">
       <div class="col-header">
-        <span id="files-header">Files</span>
+        <span id="keys-header">Keys</span>
         <div class="header-actions">
-          <button class="btn btn-icon-only" id="btn-copy-file" disabled title="Copy file">
+          <button class="btn btn-icon-only" id="btn-copy-key" disabled title="Copy key">
             <svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           </button>
-          <button class="btn btn-icon-only" id="btn-move-file" disabled title="Move file">
+          <button class="btn btn-icon-only" id="btn-move-key" disabled title="Move key">
             <svg class="icon" viewBox="0 0 24 24"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
           </button>
-          <button class="btn btn-danger btn-icon-only" id="btn-delete-file" disabled title="Delete file">
+          <button class="btn btn-danger btn-icon-only" id="btn-delete-key" disabled title="Delete key">
             <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
           </button>
         </div>
@@ -518,7 +518,7 @@
           <svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
-      <div class="col-body" id="files">
+      <div class="col-body" id="keys">
       </div>
     </div>
     <div class="col col-json">
@@ -614,8 +614,8 @@
 
 <div class="modal-backdrop" id="transfer-modal">
   <div class="modal">
-    <h3 id="transfer-title">Move file</h3>
-    <div class="hint" id="transfer-source">file.txt</div>
+    <h3 id="transfer-title">Move key</h3>
+    <div class="hint" id="transfer-source"></div>
     <div class="modal-field">
       <label class="field-label" for="transfer-dest">Destination folder</label>
       <input type="text" id="transfer-dest" placeholder="e.g. docs/work/2026" autocomplete="off" spellcheck="false">
@@ -659,22 +659,22 @@ document.getElementById("theme-toggle").addEventListener("click", () => {
 // ============================================================
 const ENDPOINTS = {
   folders:   "/api/folders",
-  files:     "/api/files",
+  keys:      "/api/keys",
   details:   "/api/details",
-  moveFile:  "/api/files/move",
-  copyFile:  "/api/files/copy",
+  moveKey:   "/api/keys/move",
+  copyKey:   "/api/keys/copy",
 };
 
 const API = {
   listFolders:  (path) => `${ENDPOINTS.folders}?path=${encodeURIComponent(path)}`,
-  listFiles:    (folderPath, offset, limit) =>
-    `${ENDPOINTS.files}?path=${encodeURIComponent(folderPath)}&offset=${offset}&limit=${limit}`,
+  listKeys:    (folderPath, offset, limit) =>
+    `${ENDPOINTS.keys}?path=${encodeURIComponent(folderPath)}&offset=${offset}&limit=${limit}`,
   itemDetails:  (id) => `${ENDPOINTS.details}?id=${encodeURIComponent(id)}`,
   createFolder: ENDPOINTS.folders,
   deleteFolder: (path) => `${ENDPOINTS.folders}?path=${encodeURIComponent(path)}`,
-  deleteFile:   (id) => `${ENDPOINTS.files}?id=${encodeURIComponent(id)}`,
-  moveFile:     ENDPOINTS.moveFile,
-  copyFile:     ENDPOINTS.copyFile,
+  deleteKey:   (id) => `${ENDPOINTS.keys}?id=${encodeURIComponent(id)}`,
+  moveKey:     ENDPOINTS.moveKey,
+  copyKey:     ENDPOINTS.copyKey,
 };
 const PAGE_SIZE = 100;
 
@@ -777,7 +777,7 @@ const ICONS = {
   chevron:      '<svg class="icon icon-chevron" viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>',
   folder:       '<svg class="icon icon-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
   folderOpen:   '<svg class="icon icon-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1H3zM3 9h18l-2 8a2 2 0 0 1-2 1H5a2 2 0 0 1-2-2z"/></svg>',
-  file:         '<svg class="icon icon-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 3 14 8 19 8"/></svg>',
+  key:          '<svg class="icon icon-key" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 3 14 8 19 8"/></svg>',
 };
 function iconEl(html) {
   const t = document.createElement("template");
@@ -790,9 +790,9 @@ function iconEl(html) {
 // ============================================================
 const treeEl = document.getElementById("tree");
 let selectedTreeRow = null;
-let selectedFileRow = null;
+let selectedKeyRow = null;
 let selectedFolder = null;  // { path, name, node }
-let selectedFile = null;    // { id, name, row, item }
+let selectedKey = null;    // { id, name, row, item }
 
 async function renderTreeChildren(container, parentPath) {
   try {
@@ -880,7 +880,7 @@ function createTreeNode(folderPath) {
     newFolderBtn.title = `New folder in ${path || "/"}`;
     deleteFolderBtn.disabled = false;
     deleteFolderBtn.title = `Delete ${path}`;
-    loadFiles(path, name);
+    loadKeys(path, name);
     clearDetailsPanel();
   });
 
@@ -888,38 +888,38 @@ function createTreeNode(folderPath) {
 }
 
 // ============================================================
-// Files (infinite scroll)
+// Keys (infinite scroll)
 // ============================================================
-const filesEl = document.getElementById("files");
-const filesHeader = document.getElementById("files-header");
+const keysEl = document.getElementById("keys");
+const keysHeader = document.getElementById("keys-header");
 const jumpOffsetInput = document.getElementById("jump-offset");
 const btnJump = document.getElementById("btn-jump");
-let fileState = null;
+let keyState = null;
 
-function loadFiles(path, displayName) {
-  filesHeader.textContent = `Files — ${displayName || path || "root"}`;
-  filesEl.innerHTML = "";
+function loadKeys(path, displayName) {
+  keysHeader.textContent = `Keys — ${displayName || path || "root"}`;
+  keysEl.innerHTML = "";
   jumpOffsetInput.value = "";
-  fileState = { path, offset: 0, total: null, loading: false, done: false };
-  selectedFile = null;
-  selectedFileRow = null;
-  setFileButtonsEnabled(false);
-  loadNextFilePage();
+  keyState = { path, offset: 0, total: null, loading: false, done: false };
+  selectedKey = null;
+  selectedKeyRow = null;
+  setKeyButtonsEnabled(false);
+  loadNextKeyPage();
 }
 
 function jumpToOffset() {
-  if (!fileState) return;
+  if (!keyState) return;
   const val = parseInt(jumpOffsetInput.value, 10);
   if (isNaN(val) || val < 0) return;
-  filesEl.innerHTML = "";
-  fileState.offset = val;
-  fileState.done = false;
-  fileState.loading = false;
-  fileState.total = null;
-  selectedFile = null;
-  selectedFileRow = null;
-  setFileButtonsEnabled(false);
-  loadNextFilePage();
+  keysEl.innerHTML = "";
+  keyState.offset = val;
+  keyState.done = false;
+  keyState.loading = false;
+  keyState.total = null;
+  selectedKey = null;
+  selectedKeyRow = null;
+  setKeyButtonsEnabled(false);
+  loadNextKeyPage();
 }
 
 btnJump.addEventListener("click", jumpToOffset);
@@ -927,53 +927,53 @@ jumpOffsetInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") jumpToOffset();
 });
 
-async function loadNextFilePage() {
-  if (!fileState || fileState.loading || fileState.done) return;
-  fileState.loading = true;
+async function loadNextKeyPage() {
+  if (!keyState || keyState.loading || keyState.done) return;
+  keyState.loading = true;
 
   try {
-    const res = await fetchJSON(API.listFiles(fileState.path, fileState.offset, PAGE_SIZE));
+    const res = await fetchJSON(API.listKeys(keyState.path, keyState.offset, PAGE_SIZE));
 
     const items = res.items || [];
-    fileState.total = res.total ?? fileState.total;
+    keyState.total = res.total ?? keyState.total;
 
-    if (items.length === 0 && fileState.offset === 0) {
-      filesEl.innerHTML = '<div class="empty-state">No files</div>';
-      fileState.done = true;
-      fileState.loading = false;
+    if (items.length === 0 && keyState.offset === 0) {
+      keysEl.innerHTML = '<div class="empty-state">No keys</div>';
+      keyState.done = true;
+      keyState.loading = false;
       return;
     }
 
-    items.forEach(item => filesEl.appendChild(createFileRow(item)));
-    fileState.offset += items.length;
+    items.forEach(item => keysEl.appendChild(createKeyRow(item)));
+    keyState.offset += items.length;
 
-    if (items.length < PAGE_SIZE || (fileState.total != null && fileState.offset >= fileState.total)) {
-      fileState.done = true;
+    if (items.length < PAGE_SIZE || (keyState.total != null && keyState.offset >= keyState.total)) {
+      keyState.done = true;
       const end = document.createElement("div");
       end.className = "loader";
-      end.textContent = `— end — ${fileState.offset} file${fileState.offset === 1 ? "" : "s"}`;
-      filesEl.appendChild(end);
+      end.textContent = `— end — ${keyState.offset} key${keyState.offset === 1 ? "" : "s"}`;
+      keysEl.appendChild(end);
     }
   } catch (e) {
     // error shown in status bar
   } finally {
-    fileState.loading = false;
+    keyState.loading = false;
   }
 }
 
-function createFileRow(item) {
+function createKeyRow(item) {
   const row = document.createElement("div");
-  row.className = "file-row";
+  row.className = "key-row";
 
-  const icon = iconEl(ICONS.file);
-  icon.classList.add("file-icon");
+  const icon = iconEl(ICONS.key);
+  icon.classList.add("key-icon");
 
   const name = document.createElement("span");
-  name.className = "file-name";
+  name.className = "key-name";
   name.textContent = item.name;
 
   const size = document.createElement("span");
-  size.className = "file-size";
+  size.className = "key-size";
   size.textContent = formatSize(item.size);
 
   row.appendChild(icon);
@@ -981,11 +981,11 @@ function createFileRow(item) {
   row.appendChild(size);
 
   row.addEventListener("click", () => {
-    if (selectedFileRow) selectedFileRow.classList.remove("selected");
+    if (selectedKeyRow) selectedKeyRow.classList.remove("selected");
     row.classList.add("selected");
-    selectedFileRow = row;
-    selectedFile = { id: item.id, name: item.name, row, item };
-    setFileButtonsEnabled(true);
+    selectedKeyRow = row;
+    selectedKey = { id: item.id, name: item.name, row, item };
+    setKeyButtonsEnabled(true);
     loadDetails(item.id);
   });
 
@@ -1000,10 +1000,10 @@ function formatSize(bytes) {
   return (bytes / 1024 / 1024 / 1024).toFixed(2) + " GB";
 }
 
-filesEl.addEventListener("scroll", () => {
-  if (!fileState || fileState.loading || fileState.done) return;
-  const nearBottom = filesEl.scrollTop + filesEl.clientHeight >= filesEl.scrollHeight - 50;
-  if (nearBottom) loadNextFilePage();
+keysEl.addEventListener("scroll", () => {
+  if (!keyState || keyState.loading || keyState.done) return;
+  const nearBottom = keysEl.scrollTop + keysEl.clientHeight >= keysEl.scrollHeight - 50;
+  if (nearBottom) loadNextKeyPage();
 });
 
 // ============================================================
@@ -1409,15 +1409,15 @@ async function doCreate() {
 }
 
 // ============================================================
-// File + folder actions (delete / move / copy)
+// Key + folder actions (delete / move / copy)
 // ============================================================
 const deleteFolderBtn = document.getElementById("btn-delete-folder");
-const deleteFileBtn   = document.getElementById("btn-delete-file");
-const moveFileBtn     = document.getElementById("btn-move-file");
-const copyFileBtn     = document.getElementById("btn-copy-file");
+const deleteKeyBtn   = document.getElementById("btn-delete-key");
+const moveKeyBtn     = document.getElementById("btn-move-key");
+const copyKeyBtn     = document.getElementById("btn-copy-key");
 
-function setFileButtonsEnabled(enabled) {
-  [deleteFileBtn, moveFileBtn, copyFileBtn].forEach(b => { b.disabled = !enabled; });
+function setKeyButtonsEnabled(enabled) {
+  [deleteKeyBtn, moveKeyBtn, copyKeyBtn].forEach(b => { b.disabled = !enabled; });
 }
 
 // --- Confirm dialog (used for deletes) ---
@@ -1511,72 +1511,72 @@ deleteFolderBtn.addEventListener("click", () => {
       deleteFolderBtn.disabled = true;
       newFolderBtn.disabled = true;
       // Clear downstream panels
-      filesEl.innerHTML = '';
-      filesHeader.textContent = "Files";
+      keysEl.innerHTML = '';
+      keysHeader.textContent = "Keys";
       clearDetailsPanel();
-      fileState = null;
-      selectedFile = null;
-      setFileButtonsEnabled(false);
+      keyState = null;
+      selectedKey = null;
+      setKeyButtonsEnabled(false);
     }
   });
 });
 
-// --- Delete file ---
-deleteFileBtn.addEventListener("click", () => {
-  if (!selectedFile) return;
-  const { id, name, row } = selectedFile;
+// --- Delete key ---
+deleteKeyBtn.addEventListener("click", () => {
+  if (!selectedKey) return;
+  const { id, name, row } = selectedKey;
   openConfirm({
-    title: "Delete file",
+    title: "Delete key",
     message: `Delete "${name}"? This cannot be undone.`,
     okLabel: "Delete",
     onConfirm: async () => {
-      await fetchJSON(API.deleteFile(id), { method: "DELETE" });
+      await fetchJSON(API.deleteKey(id), { method: "DELETE" });
       row.remove();
-      selectedFile = null;
-      selectedFileRow = null;
-      setFileButtonsEnabled(false);
+      selectedKey = null;
+      selectedKeyRow = null;
+      setKeyButtonsEnabled(false);
       clearDetailsPanel();
-      if (fileState) fileState.offset = Math.max(0, fileState.offset - 1);
+      if (keyState) keyState.offset = Math.max(0, keyState.offset - 1);
     }
   });
 });
 
-// --- Move file ---
-moveFileBtn.addEventListener("click", () => {
-  if (!selectedFile) return;
-  const { id, name, row } = selectedFile;
+// --- Move key ---
+moveKeyBtn.addEventListener("click", () => {
+  if (!selectedKey) return;
+  const { id, name, row } = selectedKey;
   openTransfer({
-    title: "Move file",
+    title: "Move key",
     source: name,
     okLabel: "Move",
     onSubmit: async (destPath) => {
       if (!destPath && destPath !== "") throw new Error("Destination is required");
-      await fetchJSON(API.moveFile, {
+      await fetchJSON(API.moveKey, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, destPath }),
       });
-      // Remove from current view since it's been moved
+      // Remove from current view since it has been moved
       row.remove();
-      selectedFile = null;
-      selectedFileRow = null;
-      setFileButtonsEnabled(false);
+      selectedKey = null;
+      selectedKeyRow = null;
+      setKeyButtonsEnabled(false);
       clearDetailsPanel();
     }
   });
 });
 
-// --- Copy file ---
-copyFileBtn.addEventListener("click", () => {
-  if (!selectedFile) return;
-  const { id, name } = selectedFile;
+// --- Copy key ---
+copyKeyBtn.addEventListener("click", () => {
+  if (!selectedKey) return;
+  const { id, name } = selectedKey;
   openTransfer({
-    title: "Copy file",
+    title: "Copy key",
     source: name,
     okLabel: "Copy",
     onSubmit: async (destPath) => {
       if (!destPath && destPath !== "") throw new Error("Destination is required");
-      await fetchJSON(API.copyFile, {
+      await fetchJSON(API.copyKey, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, destPath }),
@@ -1708,7 +1708,7 @@ async function jumpToFolder() {
     newFolderBtn.title = `New folder in ${path}`;
     deleteFolderBtn.disabled = false;
     deleteFolderBtn.title = `Delete ${path}`;
-    loadFiles(path, name);
+    loadKeys(path, name);
     // Load children if not already done
     if (targetNode.dataset.loaded === "false") {
       targetNode.dataset.loaded = "true";
