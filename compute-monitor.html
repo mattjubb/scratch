@@ -1,0 +1,2256 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vasara Compute Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/ag-grid-enterprise@32.0.2/dist/ag-grid-enterprise.min.js"></script>
+<style>
+  :root {
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --serif: 'DM Serif Display', serif;
+    --radius: 4px;
+    --transition: 0.2s ease;
+    --log-height: 220px;
+  }
+  /* Status colors injected dynamically via JS from backend config */
+
+  [data-theme="dark"] {
+    --bg-root: #0c0e11;
+    --bg-surface: #12151a;
+    --bg-raised: #181c23;
+    --bg-hover: #1e232c;
+    --border: #2a3040;
+    --border-subtle: #1e232c;
+    --text-primary: #e8ecf4;
+    --text-secondary: #8a93a6;
+    --text-muted: #565e70;
+    --accent: #4ae3b5;
+    --accent-dim: rgba(74, 227, 181, 0.10);
+    --log-bg: #0a0c0f;
+    --log-line-alt: rgba(255,255,255,0.015);
+    --log-warn: #f0a849;
+    --log-error: #f04e59;
+    --log-debug: #5b9bf7;
+    --log-info: #8a93a6;
+  }
+
+  [data-theme="light"] {
+    --bg-root: #f4f5f7;
+    --bg-surface: #ffffff;
+    --bg-raised: #f0f1f4;
+    --bg-hover: #e8eaef;
+    --border: #d0d4dc;
+    --border-subtle: #e2e5eb;
+    --text-primary: #1a1d24;
+    --text-secondary: #4a5064;
+    --text-muted: #8890a2;
+    --accent: #0f9e78;
+    --accent-dim: rgba(15, 158, 120, 0.08);
+    --log-bg: #f8f9fb;
+    --log-line-alt: rgba(0,0,0,0.02);
+    --log-warn: #c0820a;
+    --log-error: #c03030;
+    --log-debug: #3070c0;
+    --log-info: #6a7080;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%; background: var(--bg-root); color: var(--text-primary);
+    font-family: var(--sans); font-size: 13px; -webkit-font-smoothing: antialiased;
+    transition: background var(--transition), color var(--transition);
+  }
+  .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+  /* ═══ HEADER ═══ */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 54px; border-bottom: 1px solid var(--border);
+    background: var(--bg-surface); flex-shrink: 0;
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .logo { display: flex; align-items: baseline; gap: 8px; user-select: none; }
+  .logo-mark { font-family: var(--serif); font-size: 20px; color: var(--accent); letter-spacing: -0.5px; }
+  .logo-sub { font-family: var(--mono); font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  .clock { font-family: var(--mono); font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px; }
+  .pulse-dot { width: 7px; height: 7px; background: var(--accent); border-radius: 50%; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse {
+    0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(74,227,181,0.4); }
+    50% { opacity:0.6; box-shadow: 0 0 0 6px rgba(74,227,181,0); }
+  }
+  .divider { width: 1px; height: 22px; background: var(--border); }
+
+  /* ═══ SHARED SELECT ═══ */
+  .v-select { position: relative; display: inline-block; }
+  .v-select select {
+    appearance: none; font-family: var(--mono); font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px; color: var(--text-primary);
+    background: var(--bg-raised); border: 1px solid var(--border);
+    padding: 6px 30px 6px 10px; border-radius: var(--radius); cursor: pointer; outline: none;
+    transition: all 0.15s;
+  }
+  .v-select select:hover, .v-select select:focus { border-color: var(--accent); }
+  .v-select::after {
+    content: '▾'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--text-muted); font-size: 10px; pointer-events: none;
+  }
+  .v-select label {
+    font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted); margin-right: 6px;
+  }
+
+  .theme-toggle {
+    width: 32px; height: 32px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-raised); color: var(--text-secondary); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+    transition: all 0.15s; line-height: 1;
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ═══ FILTER BAR ═══ */
+  .filter-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 24px; height: 42px; border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-surface); flex-shrink: 0;
+  }
+  .filter-bar .filter-label {
+    font-family: var(--mono); font-size: 9px; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--text-muted); margin-right: 2px; flex-shrink: 0;
+  }
+  .filter-clear {
+    font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-muted); background: none; border: 1px solid var(--border);
+    padding: 4px 10px; border-radius: var(--radius); cursor: pointer; transition: all 0.15s;
+    margin-left: auto; flex-shrink: 0;
+  }
+  .filter-clear:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Multi-select dropdown */
+  .ms-dropdown { position: relative; display: inline-block; }
+  .ms-dropdown-label {
+    font-family: var(--mono); font-size: 9px; text-transform: uppercase;
+    letter-spacing: 1.2px; color: var(--text-muted); margin-right: 5px;
+  }
+  .ms-trigger {
+    display: inline-flex; align-items: center; gap: 4px; min-width: 80px; max-width: 220px;
+    font-family: var(--mono); font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--text-primary); background: var(--bg-raised);
+    border: 1px solid var(--border); padding: 4px 24px 4px 8px; border-radius: var(--radius);
+    cursor: pointer; transition: all 0.15s; position: relative; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .ms-trigger:hover, .ms-trigger.open { border-color: var(--accent); }
+  .ms-trigger::after {
+    content: '▾'; position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    color: var(--text-muted); font-size: 9px;
+  }
+  .ms-trigger .ms-chip {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: var(--accent-dim); color: var(--accent); padding: 1px 6px;
+    border-radius: 2px; font-size: 9px; font-weight: 600; flex-shrink: 0;
+  }
+  .ms-trigger .ms-chip .ms-chip-x {
+    cursor: pointer; opacity: 0.7; font-size: 10px; line-height: 1;
+  }
+  .ms-trigger .ms-chip .ms-chip-x:hover { opacity: 1; }
+  .ms-trigger .ms-placeholder { color: var(--text-muted); font-weight: 400; }
+  .ms-trigger .ms-overflow { color: var(--text-muted); font-weight: 400; font-size: 9px; flex-shrink: 0; }
+
+  .ms-menu {
+    display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 500;
+    min-width: 140px; background: var(--bg-raised); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    padding: 4px 0; max-height: 200px; overflow-y: auto;
+  }
+  .ms-menu.visible { display: block; }
+  .ms-menu-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; cursor: pointer; transition: background 0.1s;
+    font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--text-secondary);
+  }
+  .ms-menu-item:hover { background: var(--bg-hover); }
+  .ms-menu-item.selected { color: var(--accent); }
+  .ms-menu-item .ms-check {
+    width: 14px; height: 14px; border: 1px solid var(--border); border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; line-height: 1; flex-shrink: 0; transition: all 0.1s;
+  }
+  .ms-menu-item.selected .ms-check {
+    background: var(--accent); border-color: var(--accent); color: var(--bg-root);
+  }
+
+  /* ═══ TOOLBAR ═══ */
+  .toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 44px; border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-root); flex-shrink: 0;
+  }
+  .toolbar-left { display: flex; align-items: center; gap: 2px; }
+  .toolbar-right { display: flex; align-items: center; gap: 10px; }
+
+  .tab-btn {
+    font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--text-muted); background: none; border: none;
+    padding: 5px 14px; cursor: pointer; border-radius: var(--radius); transition: all 0.15s ease;
+  }
+  .tab-btn:hover { color: var(--text-secondary); background: var(--bg-hover); }
+  .tab-btn.active { color: var(--accent); background: var(--accent-dim); }
+  .tab-count { font-size: 9px; font-weight: 600; color: var(--text-muted); margin-left: 6px; opacity: 0.7; }
+  .tab-btn.active .tab-count { color: var(--accent); opacity: 0.8; }
+
+  .selection-info {
+    font-family: var(--mono); font-size: 10px; color: var(--accent);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px;
+  }
+  .actions { display: flex; align-items: center; gap: 3px; }
+  .action-btn {
+    font-family: var(--mono); font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.8px; padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-raised); color: var(--text-secondary); cursor: pointer;
+    transition: all 0.15s ease; display: flex; align-items: center; gap: 4px; white-space: nowrap;
+  }
+  .action-btn:hover { border-color: var(--text-muted); background: var(--bg-hover); color: var(--text-primary); }
+  .action-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .action-btn:disabled:hover { border-color: var(--border); background: var(--bg-raised); color: var(--text-secondary); }
+  /* Action button hover colors injected dynamically from backend config */
+  .action-btn.manual:not(:disabled):hover { border-color: var(--accent); color: var(--accent); }
+  .action-icon { font-size: 11px; line-height: 1; }
+
+  .search-box { position: relative; }
+  .search-box input {
+    font-family: var(--mono); font-size: 11px; color: var(--text-primary);
+    background: var(--bg-raised); border: 1px solid var(--border);
+    padding: 5px 10px 5px 26px; border-radius: var(--radius); outline: none;
+    width: 160px; transition: all 0.15s;
+  }
+  .search-box input::placeholder { color: var(--text-muted); }
+  .search-box input:focus { border-color: var(--accent); width: 220px; }
+  .search-box::before {
+    content: '⌕'; position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+    color: var(--text-muted); font-size: 13px; pointer-events: none;
+  }
+
+  /* ═══ GRID ═══ */
+  .grid-wrapper { flex: 1; padding: 8px 24px 0; overflow: hidden; min-height: 0; }
+  #grid-container {
+    height: 100%; width: 100%; border-radius: var(--radius);
+    overflow: hidden; border: 1px solid var(--border-subtle);
+  }
+  .ag-theme-alpine, .ag-theme-alpine-dark {
+    --ag-font-family: var(--mono); --ag-font-size: 11px;
+    --ag-header-height: 36px; --ag-row-height: 34px;
+    --ag-grid-size: 4px; --ag-cell-horizontal-padding: 12px;
+    --ag-row-group-indent-size: 20px; --ag-borders: none;
+    --ag-row-border-style: solid; --ag-row-border-width: 1px;
+    --ag-header-column-separator-display: none; --ag-wrapper-border-radius: 0;
+    --ag-background-color: var(--bg-surface); --ag-header-background-color: var(--bg-raised);
+    --ag-odd-row-background-color: var(--bg-surface); --ag-row-hover-color: var(--bg-hover);
+    --ag-selected-row-background-color: var(--accent-dim); --ag-border-color: var(--border-subtle);
+    --ag-header-foreground-color: var(--text-muted); --ag-foreground-color: var(--text-secondary);
+    --ag-row-border-color: var(--border-subtle); --ag-range-selection-background-color: var(--accent-dim);
+    --ag-secondary-foreground-color: var(--text-muted); --ag-subheader-background-color: var(--bg-raised);
+    --ag-control-panel-background-color: var(--bg-raised); --ag-icon-font-color: var(--text-muted);
+  }
+  .ag-theme-alpine .ag-header, .ag-theme-alpine-dark .ag-header {
+    font-family: var(--mono); font-size: 9.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1.5px;
+  }
+  .ag-theme-alpine .ag-group-value, .ag-theme-alpine-dark .ag-group-value {
+    font-family: var(--mono); font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.5px; font-size: 11px;
+  }
+  .ag-theme-alpine .ag-row-group, .ag-theme-alpine-dark .ag-row-group { background: var(--bg-raised) !important; }
+  .ag-theme-alpine .ag-row-group:hover, .ag-theme-alpine-dark .ag-row-group:hover { background: var(--bg-hover) !important; }
+  .ag-theme-alpine .ag-group-child-count, .ag-theme-alpine-dark .ag-group-child-count {
+    font-weight: 400; color: var(--text-muted); font-size: 10px; margin-left: 6px;
+  }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono);
+    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px;
+    padding: 2px 8px; border-radius: 3px; line-height: 1.6;
+  }
+  .status-pill .dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+  /* Per-status styles injected dynamically from backend config */
+  .runtime-cell { font-family: var(--mono); font-size: 10px; color: var(--accent); font-weight: 500; }
+  .path-cell { color: var(--text-primary) !important; font-weight: 500; }
+  .host-cell { font-size: 10px; }
+  .tag-cell  { font-size: 10px; color: var(--text-muted); }
+  .time-cell { font-size: 10px; }
+
+  /* ═══ TASKS VIEW ═══ */
+  .tasks-view {
+    display: none; flex: 1; flex-direction: column; padding: 8px 24px 0;
+    overflow: hidden; min-height: 0; gap: 6px;
+  }
+  .tasks-view.visible { display: flex; }
+
+  .tasks-top-section {
+    display: flex; flex: 1; gap: 12px; min-height: 0; overflow: hidden;
+  }
+  .tasks-left { display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 6px; overflow: hidden; }
+
+  .tasks-panel-label {
+    font-family: var(--mono); font-size: 9px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted);
+    padding: 0 2px; flex-shrink: 0;
+  }
+  .tasks-parent-grid, .tasks-child-grid {
+    flex: 1; min-height: 120px; border-radius: var(--radius);
+    overflow: hidden; border: 1px solid var(--border-subtle);
+  }
+
+  /* Heatmap */
+  .tasks-heatmap-wrapper {
+    width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; overflow: hidden;
+  }
+  .tasks-heatmap-panel {
+    flex: 1; display: flex; flex-direction: column;
+    border: 1px solid var(--border-subtle); border-radius: var(--radius);
+    background: var(--bg-surface); overflow: hidden;
+  }
+  .tasks-heatmap-header {
+    padding: 8px 12px; border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .tasks-heatmap-stats {
+    font-family: var(--mono); font-size: 9px; color: var(--text-muted);
+  }
+  .tasks-heatmap-body {
+    flex: 1; overflow-y: auto; padding: 10px;
+    display: flex; flex-wrap: wrap; align-content: flex-start; gap: 3px;
+  }
+  .tasks-heatmap-body::-webkit-scrollbar { width: 5px; }
+  .tasks-heatmap-body::-webkit-scrollbar-track { background: transparent; }
+  .tasks-heatmap-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .hm-cell {
+    width: 18px; height: 18px; border-radius: 2px;
+    cursor: pointer; transition: all 0.15s; position: relative;
+    border: 1px solid transparent;
+  }
+  .hm-cell:hover { transform: scale(1.3); z-index: 1; border-color: var(--text-primary); }
+  .hm-cell.selected { border-color: var(--text-primary); box-shadow: 0 0 0 1px var(--text-primary); transform: scale(1.2); z-index: 1; }
+  .hm-cell.pending   { background: var(--bg-hover); }
+  .hm-cell.running   { background: #5b9bf7; }
+  .hm-cell.completed { background: #2dd4a0; }
+  .hm-cell.failed    { background: #f04e59; }
+
+  .hm-tooltip {
+    position: fixed; z-index: 9999; pointer-events: none;
+    background: var(--bg-raised); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 6px 10px;
+    font-family: var(--mono); font-size: 10px; color: var(--text-secondary);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3); white-space: nowrap;
+    display: none;
+  }
+  .hm-tooltip.visible { display: block; }
+
+  /* ═══ LOG PANEL ═══ */
+  .log-panel {
+    flex-shrink: 0; border-top: 1px solid var(--border);
+    background: var(--bg-surface); display: flex; flex-direction: column;
+    transition: height 0.25s ease, background var(--transition);
+    overflow: hidden;
+  }
+  .log-panel.collapsed { height: 32px !important; }
+  .log-panel.expanded { height: var(--log-height); }
+  .log-panel.hidden { height: 0 !important; border-top: none; }
+
+  .log-resize-handle.hidden { display: none; }
+
+  .log-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 32px; flex-shrink: 0; cursor: pointer;
+    user-select: none; border-bottom: 1px solid var(--border-subtle);
+  }
+  .log-header:hover { background: var(--bg-hover); }
+  .log-header-left { display: flex; align-items: center; gap: 8px; }
+  .log-header-right { display: flex; align-items: center; gap: 6px; }
+  .log-chevron {
+    font-size: 9px; color: var(--text-muted); transition: transform 0.2s;
+  }
+  .log-panel.collapsed .log-chevron { transform: rotate(-90deg); }
+  .log-title {
+    font-family: var(--mono); font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1.2px; color: var(--text-muted);
+  }
+  .log-path-label {
+    font-family: var(--mono); font-size: 10px; color: var(--accent); font-weight: 500;
+    margin-left: 8px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .log-ctrl-btn {
+    width: 24px; height: 24px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-raised); color: var(--text-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 12px;
+    transition: all 0.15s; line-height: 1;
+  }
+  .log-ctrl-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .log-ctrl-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+  .log-body {
+    flex: 1; overflow-y: auto; background: var(--log-bg);
+    padding: 6px 0; font-family: var(--mono); font-size: 11px; line-height: 1.7;
+  }
+  .log-body::-webkit-scrollbar { width: 6px; }
+  .log-body::-webkit-scrollbar-track { background: transparent; }
+  .log-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .log-line {
+    padding: 0 24px; white-space: pre; display: flex; gap: 0;
+  }
+  .log-line:nth-child(even) { background: var(--log-line-alt); }
+  .log-ts { color: var(--text-muted); min-width: 90px; flex-shrink: 0; }
+  .log-lvl { min-width: 52px; flex-shrink: 0; font-weight: 600; }
+  .log-lvl.INFO  { color: var(--log-info); }
+  .log-lvl.WARN  { color: var(--log-warn); }
+  .log-lvl.ERROR { color: var(--log-error); }
+  .log-lvl.DEBUG { color: var(--log-debug); }
+  .log-msg { color: var(--text-secondary); }
+
+  .log-empty {
+    display: flex; align-items: center; justify-content: center;
+    height: 100%; color: var(--text-muted); font-family: var(--mono);
+    font-size: 11px; letter-spacing: 0.5px;
+  }
+
+  /* ═══ LOG FULLSCREEN OVERLAY ═══ */
+  .log-overlay {
+    position: fixed; inset: 0; z-index: 9000; background: var(--bg-root);
+    display: none; flex-direction: column;
+  }
+  .log-overlay.visible { display: flex; }
+
+  .log-overlay-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 48px; border-bottom: 1px solid var(--border);
+    background: var(--bg-surface); flex-shrink: 0;
+  }
+  .log-overlay-header-left { display: flex; align-items: center; gap: 12px; }
+  .log-overlay-header-right { display: flex; align-items: center; gap: 8px; }
+  .log-overlay-title {
+    font-family: var(--serif); font-size: 16px; color: var(--accent);
+  }
+  .log-overlay-path {
+    font-family: var(--mono); font-size: 11px; color: var(--text-secondary);
+  }
+  .log-overlay-close {
+    font-family: var(--mono); font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1px; padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-raised); color: var(--text-secondary); cursor: pointer; transition: all 0.15s;
+  }
+  .log-overlay-close:hover { border-color: var(--accent); color: var(--accent); }
+
+  .log-overlay .log-body-full {
+    flex: 1; overflow-y: auto; background: var(--log-bg);
+    padding: 12px 0; font-family: var(--mono); font-size: 11px; line-height: 1.7;
+  }
+  .log-overlay .log-body-full::-webkit-scrollbar { width: 6px; }
+  .log-overlay .log-body-full::-webkit-scrollbar-track { background: transparent; }
+  .log-overlay .log-body-full::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ═══ JOB DATE PICKER ═══ */
+  .job-date-picker {
+    display: none; align-items: center; gap: 6px;
+  }
+  .job-date-picker.visible { display: flex; }
+  .job-date-picker label {
+    font-family: var(--mono); font-size: 9px; text-transform: uppercase;
+    letter-spacing: 1.2px; color: var(--text-muted);
+  }
+  .job-date-picker input[type="date"] {
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    color: var(--text-primary); background: var(--bg-raised);
+    border: 1px solid var(--border); padding: 4px 8px;
+    border-radius: var(--radius); outline: none; cursor: pointer;
+    transition: all 0.15s; color-scheme: dark;
+  }
+  [data-theme="light"] .job-date-picker input[type="date"] { color-scheme: light; }
+  .job-date-picker input[type="date"]:hover,
+  .job-date-picker input[type="date"]:focus { border-color: var(--accent); }
+  .job-date-nav {
+    width: 24px; height: 24px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-raised); color: var(--text-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 11px;
+    transition: all 0.15s; line-height: 1;
+  }
+  .job-date-nav:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ═══ RESIZE HANDLE ═══ */
+  .log-resize-handle {
+    height: 4px; cursor: ns-resize; background: transparent;
+    position: relative; flex-shrink: 0;
+  }
+  .log-resize-handle:hover, .log-resize-handle.active {
+    background: var(--accent-dim);
+  }
+  .log-resize-handle::after {
+    content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 32px; height: 2px; border-radius: 1px; background: var(--border);
+  }
+
+  /* ═══ FOOTER ═══ */
+  .footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 30px; border-top: 1px solid var(--border-subtle);
+    background: var(--bg-surface); flex-shrink: 0;
+  }
+  .footer-left, .footer-right {
+    font-family: var(--mono); font-size: 10px; color: var(--text-muted);
+    display: flex; align-items: center; gap: 16px;
+  }
+  .footer-stat { display: flex; align-items: center; gap: 5px; }
+  .footer-stat .dot { width: 5px; height: 5px; border-radius: 50%; }
+
+  /* ═══ TOAST ═══ */
+  .toast-container {
+    position: fixed; bottom: 48px; right: 24px; z-index: 10000;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .toast {
+    font-family: var(--mono); font-size: 11px; padding: 10px 16px;
+    background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text-secondary); animation: toast-in 0.25s ease-out;
+    display: flex; align-items: center; gap: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+  /* Toast border colors set inline from backend config */
+  @keyframes toast-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+  /* ═══ RUN MANUAL DIALOG ═══ */
+  .dialog-backdrop {
+    position: fixed; inset: 0; z-index: 8000;
+    background: rgba(0,0,0,0.55); display: none;
+    align-items: center; justify-content: center;
+    animation: fade-in 0.15s ease-out;
+  }
+  .dialog-backdrop.visible { display: flex; }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+  .dialog {
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: 6px; width: 520px; max-height: 80vh;
+    display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+    animation: dialog-in 0.2s ease-out;
+  }
+  @keyframes dialog-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .dialog-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px 12px; border-bottom: 1px solid var(--border-subtle);
+  }
+  .dialog-header-left { display: flex; flex-direction: column; gap: 2px; }
+  .dialog-title {
+    font-family: var(--mono); font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px; color: var(--text-primary);
+  }
+  .dialog-subtitle {
+    font-family: var(--mono); font-size: 10px; color: var(--accent);
+    max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .dialog-close {
+    width: 28px; height: 28px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-raised); color: var(--text-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+    transition: all 0.15s; line-height: 1;
+  }
+  .dialog-close:hover { border-color: var(--accent); color: var(--accent); }
+
+  .dialog-body {
+    padding: 16px 20px; overflow-y: auto; flex: 1;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .dialog-body::-webkit-scrollbar { width: 5px; }
+  .dialog-body::-webkit-scrollbar-track { background: transparent; }
+  .dialog-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .arg-table {
+    width: 100%; border-collapse: collapse;
+    font-family: var(--mono); font-size: 11px;
+  }
+  .arg-table thead th {
+    font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted); text-align: left; padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .arg-table thead th:last-child { width: 32px; text-align: center; }
+  .arg-table tbody td {
+    padding: 4px 4px; border-bottom: 1px solid var(--border-subtle); vertical-align: middle;
+  }
+  .arg-table tbody td input {
+    width: 100%; font-family: var(--mono); font-size: 11px;
+    color: var(--text-primary); background: var(--bg-raised);
+    border: 1px solid var(--border); padding: 5px 8px;
+    border-radius: var(--radius); outline: none; transition: border-color 0.15s;
+  }
+  .arg-table tbody td input:focus { border-color: var(--accent); }
+  .arg-table tbody td input.arg-key {
+    font-weight: 600; color: var(--text-secondary);
+  }
+  .arg-remove-btn {
+    width: 24px; height: 24px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-raised); color: var(--text-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+    transition: all 0.15s; line-height: 1; margin: 0 auto;
+  }
+  .arg-remove-btn:hover { border-color: var(--status-failed, #f04e59); color: var(--status-failed, #f04e59); }
+
+  .arg-add-row {
+    display: flex; align-items: center; gap: 6px; margin-top: 6px;
+  }
+  .arg-add-btn {
+    font-family: var(--mono); font-size: 9px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1px; padding: 5px 12px; border: 1px dashed var(--border);
+    border-radius: var(--radius); background: none; color: var(--text-muted);
+    cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 4px;
+  }
+  .arg-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .dialog-footer {
+    display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    padding: 12px 20px; border-top: 1px solid var(--border-subtle);
+  }
+  .dialog-btn {
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px; padding: 7px 18px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .dialog-btn.secondary {
+    background: var(--bg-raised); color: var(--text-secondary);
+  }
+  .dialog-btn.secondary:hover { border-color: var(--text-muted); color: var(--text-primary); }
+  .dialog-btn.primary {
+    background: var(--accent); border-color: var(--accent); color: var(--bg-root);
+  }
+  .dialog-btn.primary:hover { opacity: 0.9; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">
+        <span class="logo-mark">Vasara</span>
+        <span class="logo-sub">Compute Monitor</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="clock" id="clock"></div>
+      <div class="pulse-dot"></div>
+      <div class="divider"></div>
+      <div class="v-select">
+        <select id="lane-select">
+          <option value="dev">DEV</option>
+          <option value="sit">SIT</option>
+          <option value="uat">UAT</option>
+          <option value="pfix">PFIX</option>
+          <option value="prod">PROD</option>
+        </select>
+      </div>
+      <div class="divider"></div>
+      <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark">☽</button>
+    </div>
+  </header>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <button class="tab-btn active" data-tab="services">Services<span class="tab-count" id="count-services">0</span></button>
+      <button class="tab-btn" data-tab="jobs">Jobs<span class="tab-count" id="count-jobs">0</span></button>
+      <button class="tab-btn" data-tab="tasks">Tasks<span class="tab-count" id="count-tasks">0</span></button>
+      <div class="divider" style="margin: 0 6px;"></div>
+      <div class="job-date-picker" id="job-date-picker">
+        <label>As-of</label>
+        <button class="job-date-nav" onclick="shiftJobDate(-1)" title="Previous day">◂</button>
+        <input type="date" id="job-date-input">
+        <button class="job-date-nav" onclick="shiftJobDate(1)" title="Next day">▸</button>
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <div class="actions">
+        <button class="action-btn start" id="btn-start" disabled onclick="doAction('start')"><span class="action-icon">▶</span> Start</button>
+        <button class="action-btn stop" id="btn-stop" disabled onclick="doAction('stop')"><span class="action-icon">■</span> Stop</button>
+        <button class="action-btn restart" id="btn-restart" disabled onclick="doAction('restart')"><span class="action-icon">↻</span> Restart</button>
+        <button class="action-btn ice" id="btn-ice" disabled onclick="doAction('ice')"><span class="action-icon">❄</span> Ice</button>
+        <div class="divider" style="margin: 0 2px;"></div>
+        <button class="action-btn manual" id="btn-manual" disabled onclick="openManualRunDialog()"><span class="action-icon">⚙</span> Run Manual</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <span class="filter-label">Filters</span>
+
+    <div class="ms-dropdown" id="ms-group">
+      <span class="ms-dropdown-label">Group</span>
+      <div class="ms-trigger" onclick="toggleMenu('ms-group')">
+        <span class="ms-placeholder">All</span>
+      </div>
+      <div class="ms-menu">
+        <div class="ms-menu-item" data-value="core" onclick="toggleOption('ms-group','core')"><span class="ms-check"></span>core</div>
+        <div class="ms-menu-item" data-value="rates" onclick="toggleOption('ms-group','rates')"><span class="ms-check"></span>rates</div>
+        <div class="ms-menu-item" data-value="fx" onclick="toggleOption('ms-group','fx')"><span class="ms-check"></span>fx</div>
+      </div>
+    </div>
+
+    <div class="ms-dropdown" id="ms-project">
+      <span class="ms-dropdown-label">Project</span>
+      <div class="ms-trigger" onclick="toggleMenu('ms-project')">
+        <span class="ms-placeholder">All</span>
+      </div>
+      <div class="ms-menu">
+        <div class="ms-menu-item" data-value="entitlements" onclick="toggleOption('ms-project','entitlements')"><span class="ms-check"></span>entitlements</div>
+        <div class="ms-menu-item" data-value="swaps" onclick="toggleOption('ms-project','swaps')"><span class="ms-check"></span>swaps</div>
+        <div class="ms-menu-item" data-value="options" onclick="toggleOption('ms-project','options')"><span class="ms-check"></span>options</div>
+      </div>
+    </div>
+
+    <button class="filter-clear" onclick="clearFilters()">Clear</button>
+    <div class="search-box">
+      <input type="text" id="search-input" placeholder="Search…" oninput="onSearch()">
+    </div>
+  </div>
+
+  <!-- GRID (services/jobs) -->
+  <div class="grid-wrapper" id="main-grid-wrapper">
+    <div id="grid-container" class="ag-theme-alpine-dark"></div>
+  </div>
+
+  <!-- TASKS VIEW -->
+  <div class="tasks-view" id="tasks-view">
+    <div class="tasks-top-section">
+      <div class="tasks-left">
+        <span class="tasks-panel-label">Parent Tasks</span>
+        <div class="tasks-parent-grid" id="tasks-parent-grid-container"></div>
+        <span class="tasks-panel-label" id="child-label">Subtasks</span>
+        <div class="tasks-child-grid" id="tasks-child-grid-container"></div>
+      </div>
+      <div class="tasks-heatmap-wrapper" id="tasks-heatmap-wrapper" style="display:none;">
+        <span class="tasks-panel-label">Subtask Grid</span>
+        <div class="tasks-heatmap-panel" id="tasks-heatmap-panel">
+          <div class="tasks-heatmap-header">
+            <span class="tasks-heatmap-stats" id="heatmap-stats"></span>
+          </div>
+          <div class="tasks-heatmap-body" id="heatmap-body"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="hm-tooltip" id="hm-tooltip"></div>
+
+  <!-- LOG PANEL -->
+  <div class="log-resize-handle hidden" id="log-resize-handle"></div>
+  <div class="log-panel hidden" id="log-panel">
+    <div class="log-header" id="log-header">
+      <div class="log-header-left">
+        <span class="log-chevron" id="log-chevron">▼</span>
+        <span class="log-title">Log Output</span>
+        <span class="log-path-label" id="log-path-label">—</span>
+      </div>
+      <div class="log-header-right">
+        <button class="log-ctrl-btn active" id="log-tail-btn" title="Auto-tail" onclick="toggleTail(event)">⇩</button>
+        <button class="log-ctrl-btn" id="log-expand-btn" title="Fullscreen" onclick="openLogOverlay(event)">⛶</button>
+      </div>
+    </div>
+    <div class="log-body" id="log-body">
+      <div class="log-empty">Select a service, job, or task to view logs</div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-left" id="footer-stats"></div>
+    <div class="footer-right"><span id="lane-label">LANE: DEV</span></div>
+  </div>
+</div>
+
+<!-- LOG FULLSCREEN OVERLAY -->
+<div class="log-overlay" id="log-overlay">
+  <div class="log-overlay-header">
+    <div class="log-overlay-header-left">
+      <span class="log-overlay-title">Log Viewer</span>
+      <span class="log-overlay-path" id="log-overlay-path">—</span>
+    </div>
+    <div class="log-overlay-header-right">
+      <button class="log-ctrl-btn" id="log-overlay-tail-btn" title="Auto-tail" onclick="toggleOverlayTail(event)">⇩</button>
+      <button class="log-overlay-close" onclick="closeLogOverlay()">✕ Close</button>
+    </div>
+  </div>
+  <div class="log-body-full" id="log-overlay-body"></div>
+</div>
+
+<!-- RUN MANUAL DIALOG -->
+<div class="dialog-backdrop" id="manual-dialog-backdrop" onclick="closeManualDialog(event)">
+  <div class="dialog" onclick="event.stopPropagation()">
+    <div class="dialog-header">
+      <div class="dialog-header-left">
+        <span class="dialog-title">Run Manual</span>
+        <span class="dialog-subtitle" id="manual-dialog-path">—</span>
+      </div>
+      <button class="dialog-close" onclick="closeManualDialog()">✕</button>
+    </div>
+    <div class="dialog-body" id="manual-dialog-body"></div>
+    <div class="dialog-footer">
+      <button class="dialog-btn secondary" onclick="closeManualDialog()">Cancel</button>
+      <button class="dialog-btn primary" onclick="executeManualRun()">▶ Run Now</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ═══ STATE ═══
+let currentTab = 'services';
+let currentLane = 'dev';
+let selectedRow = null;
+let gridApi = null;
+let isDark = true;
+let logTailing = true;
+let overlayTailing = true;
+let logInterval = null;
+let activeFilters = { groups: [], projects: [] };
+let jobDate = new Date(); // current as-of date for jobs tab
+
+// ═══ THEME ═══
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  isDark = !isDark;
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  document.getElementById('theme-toggle').textContent = isDark ? '☽' : '☀';
+  const gridEl = document.getElementById('grid-container');
+  gridEl.classList.remove('ag-theme-alpine', 'ag-theme-alpine-dark');
+  gridEl.classList.add(isDark ? 'ag-theme-alpine-dark' : 'ag-theme-alpine');
+  // Re-theme tasks grids
+  ['tasks-parent-grid-container', 'tasks-child-grid-container'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.classList.remove('ag-theme-alpine', 'ag-theme-alpine-dark'); el.classList.add(isDark ? 'ag-theme-alpine-dark' : 'ag-theme-alpine'); }
+  });
+});
+
+// ═══ DATA ═══
+const GROUP_PROJECTS = [
+  { group: 'core', project: 'entitlements' },
+  { group: 'rates', project: 'swaps' },
+  { group: 'fx', project: 'options' },
+];
+
+const PATH_CATALOG = {
+  services: {
+    'core/entitlements': [
+      '/policy/evaluator/v2', '/role/resolver/sync', '/permission/checker/realtime',
+      '/grant/dispatcher/async', '/scope/validator/v1', '/token/introspector/v2',
+      '/audit/logger/stream', '/delegation/handler/batch', '/claim/mapper/v3',
+      '/session/enforcer/sync',
+    ],
+    'rates/swaps': [
+      '/curve/builder/realtime', '/fixing/publisher/async', '/valuation/engine/v2',
+      '/cashflow/projector/batch', '/reset/monitor/stream', '/spread/calculator/v1',
+      '/netting/aggregator/sync', '/tenor/resolver/v2', '/benchmark/tracker/realtime',
+      '/pv/server/async',
+    ],
+    'fx/options': [
+      '/vol/surface/builder/v2', '/pricer/vanilla/realtime', '/pricer/barrier/async',
+      '/greeks/calculator/stream', '/smile/interpolator/v1', '/expiry/monitor/sync',
+      '/delta/hedger/batch', '/strike/resolver/v2', '/market/feed/realtime',
+      '/payoff/evaluator/async',
+    ],
+  },
+  jobs: {
+    'core/entitlements': [
+      '/daily-sync/ldap/extract', '/role-review/quarterly/publish',
+      '/orphan-accounts/sweep/purge', '/access-cert/campaign/transform',
+      '/sod-conflict/scan/archive', '/privilege-escalation/detect/extract',
+      '/offboarding/revoke/publish', '/entitlement-drift/compare/transform',
+    ],
+    'rates/swaps': [
+      '/eod-curves/build/publish', '/fixings/daily-snap/extract',
+      '/pnl-explain/attribution/transform', '/cashflow/projection/archive',
+      '/trade-lifecycle/eod-roll/publish', '/reset-rates/capture/extract',
+      '/collateral/margin-calc/transform', '/benchmark-transition/migrate/purge',
+    ],
+    'fx/options': [
+      '/vol-surface/eod-snap/extract', '/expiry-calendar/daily-load/publish',
+      '/greeks-batch/overnight/transform', '/barrier-monitor/intraday-snap/extract',
+      '/exercise-notice/deadline/publish', '/premium-settlement/daily/archive',
+      '/smile-params/fit/transform', '/exotic-revalue/weekly-agg/purge',
+    ],
+  },
+};
+
+// ═══ BACKEND CONFIG (simulated — in production this comes from an API) ═══
+const BACKEND_CONFIG = {
+  statuses: [
+    { name: 'running',   color: '#2dd4a0', pulse: true,  terminal: false },
+    { name: 'pending',   color: '#f0a849', pulse: true,  terminal: false },
+    { name: 'completed', color: '#8a93a6', pulse: false, terminal: true },
+    { name: 'failed',    color: '#f04e59', pulse: false, terminal: true },
+    { name: 'stopped',   color: '#f04e59', pulse: false, terminal: true },
+    { name: 'iced',      color: '#5b9bf7', pulse: false, terminal: false },
+  ],
+  // Which statuses appear in each tab's sample data (weighted by frequency)
+  statusWeights: {
+    services: { running: 4, stopped: 1, iced: 1, pending: 1 },
+    jobs:     { running: 1, completed: 3, failed: 1, pending: 1, stopped: 1 },
+  },
+  // Action → resulting status mapping
+  actions: {
+    start:   { resultStatus: 'running'  },
+    stop:    { resultStatus: 'stopped'  },
+    restart: { resultStatus: 'pending'  },
+    ice:     { resultStatus: 'iced'     },
+  },
+  // Map action button classes to status colors for hover
+  actionButtonColors: {
+    start:   'running',
+    stop:    'stopped',
+    restart: 'pending',
+    ice:     'iced',
+  },
+};
+
+// Build lookup maps from config
+const STATUS_MAP = {};
+BACKEND_CONFIG.statuses.forEach(s => { STATUS_MAP[s.name] = s; });
+
+function isTerminalStatus(status) {
+  const cfg = STATUS_MAP[status];
+  return cfg ? cfg.terminal : false;
+}
+
+function isActiveStatus(status) {
+  const cfg = STATUS_MAP[status];
+  return cfg ? !cfg.terminal : false;
+}
+
+function getStatusColor(status) {
+  const cfg = STATUS_MAP[status];
+  return cfg ? cfg.color : '#8a93a6';
+}
+
+// Build weighted status arrays from config weights
+function buildStatusPool(tab) {
+  const weights = BACKEND_CONFIG.statusWeights[tab] || {};
+  const pool = [];
+  for (const [status, weight] of Object.entries(weights)) {
+    for (let i = 0; i < weight; i++) pool.push(status);
+  }
+  return pool;
+}
+const STATUSES_MAP = {
+  services: buildStatusPool('services'),
+  jobs: buildStatusPool('jobs'),
+};
+
+// ═══ INJECT DYNAMIC CSS FROM BACKEND CONFIG ═══
+function injectStatusCSS() {
+  let css = '';
+  for (const s of BACKEND_CONFIG.statuses) {
+    const r = parseInt(s.color.slice(1,3),16);
+    const g = parseInt(s.color.slice(3,5),16);
+    const b = parseInt(s.color.slice(5,7),16);
+    css += `.status-${s.name} .dot { background: ${s.color};${s.pulse ? ' animation: pulse 2s ease-in-out infinite;' : ''} }\n`;
+    css += `.status-${s.name} { color: ${s.color}; background: rgba(${r},${g},${b},0.1); }\n`;
+  }
+  // Action button hover colors
+  for (const [action, statusName] of Object.entries(BACKEND_CONFIG.actionButtonColors)) {
+    const color = getStatusColor(statusName);
+    css += `.action-btn.${action}:not(:disabled):hover { border-color: ${color}; color: ${color}; }\n`;
+  }
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+}
+injectStatusCSS();
+
+// ═══ DYNAMIC FOOTER ═══
+function buildFooterStats() {
+  const container = document.getElementById('footer-stats');
+  let html = '';
+  for (const s of BACKEND_CONFIG.statuses) {
+    html += `<div class="footer-stat"><div class="dot" style="background:${s.color}"></div><span id="stat-${s.name}">0 ${s.name}</span></div>`;
+  }
+  container.innerHTML = html;
+}
+buildFooterStats();
+
+const HOSTS = ['nyc-app-01','nyc-app-02','nyc-app-03','ldn-app-01','ldn-app-02','sgp-app-01'];
+const TAGS_MAP = { dev:['dev','snapshot'], sit:['sit','rc'], uat:['uat','stage'], pfix:['hotfix','patch'], prod:['release','stable'] };
+
+function seededRandom(seed) { let s = seed; return () => { s = (s*16807)%2147483647; return (s-1)/2147483646; }; }
+function pick(arr, rng) { return arr[Math.floor(rng()*arr.length)]; }
+function fmtTime(d) {
+  if (!d) return '—';
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function fmtTimeShort(d) {
+  const p = n => String(n).padStart(2,'0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function fmtDuration(ms) {
+  if (ms < 0) ms = 0;
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = n => String(n).padStart(2, '0');
+  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
+  return `${m}:${pad(s)}`;
+}
+
+const dataCache = {};
+function fmtDateKey(d) {
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+function generateData(tab, lane) {
+  const dateKey = tab === 'jobs' ? fmtDateKey(jobDate) : 'n/a';
+  const key = `${tab}:${lane}:${dateKey}`;
+  if (dataCache[key]) return dataCache[key];
+
+  let seed = tab.charCodeAt(0)*1000 + lane.charCodeAt(0)*100 + lane.charCodeAt(1);
+  if (tab === 'jobs') {
+    seed += jobDate.getFullYear()*400 + (jobDate.getMonth()+1)*32 + jobDate.getDate();
+  }
+  const rng = seededRandom(seed);
+  const items = [];
+  const statuses = STATUSES_MAP[tab];
+  const catalog = PATH_CATALOG[tab];
+
+  const jobDayStart = tab === 'jobs'
+    ? new Date(jobDate.getFullYear(), jobDate.getMonth(), jobDate.getDate(), 0, 0, 0).getTime()
+    : 0;
+
+  for (const gp of GROUP_PROJECTS) {
+    const gpKey = `${gp.group}/${gp.project}`;
+    const allPaths = catalog[gpKey];
+    const shuffled = [...allPaths].sort(() => rng() - 0.5);
+    const count = Math.max(3, Math.floor(rng() * shuffled.length) + 2);
+    const selected = shuffled.slice(0, Math.min(count, shuffled.length));
+    for (const pathStr of selected) {
+      const status = pick(statuses, rng);
+      let startTime, endTime = null;
+
+      if (tab === 'jobs') {
+        startTime = new Date(jobDayStart + Math.floor(rng() * 18 * 3600000));
+        if (isTerminalStatus(status)) {
+          endTime = new Date(startTime.getTime() + Math.floor(rng() * 7200000));
+        }
+      } else {
+        startTime = new Date(Date.now() - Math.floor(rng()*72*3600000));
+        if (isTerminalStatus(status)) {
+          endTime = new Date(startTime.getTime() + Math.floor(rng()*7200000));
+        }
+      }
+
+      items.push({
+        id: `${tab}-${lane}-${dateKey}-${items.length}`,
+        group: gp.group, project: gp.project,
+        fullPath: `/${gp.group}/${gp.project}${pathStr}`, path: pathStr,
+        status, startTime, endTime,
+        host: pick(HOSTS, rng), tag: pick(TAGS_MAP[lane], rng),
+      });
+    }
+  }
+  dataCache[key] = items;
+  return items;
+}
+
+// ═══ AG GRID ═══
+function statusRenderer(params) {
+  if (!params.value) return '';
+  return `<span class="status-pill status-${params.value}"><span class="dot"></span>${params.value}</span>`;
+}
+function timeRenderer(params) {
+  return `<span class="time-cell">${params.value ? fmtTime(params.value) : '—'}</span>`;
+}
+function runtimeRenderer(params) {
+  if (!params.data) return '';
+  const d = params.data;
+  if (d.endTime && d.startTime) {
+    return `<span class="time-cell">${fmtDuration(d.endTime - d.startTime)}</span>`;
+  }
+  if (!isTerminalStatus(d.status) && d.startTime) {
+    const elapsed = Date.now() - d.startTime.getTime();
+    return `<span class="runtime-cell">${fmtDuration(elapsed)}</span>`;
+  }
+  return '<span class="time-cell">—</span>';
+}
+
+let columnDefs = buildColumnDefs(true);
+
+function buildColumnDefs(withGrouping) {
+  const cols = [];
+  if (withGrouping) {
+    cols.push({ field:'group', rowGroup:true, hide:true });
+    cols.push({ field:'project', rowGroup:true, hide:true });
+  } else {
+    cols.push({ headerName:'Group', field:'group', width:100, cellClass:'tag-cell', filter:true });
+    cols.push({ headerName:'Project', field:'project', width:120, cellClass:'tag-cell', filter:true });
+  }
+  cols.push(
+    { headerName:'Path', field:'path', flex:2, minWidth:180, cellClass:'path-cell', filter:true },
+    { headerName:'Status', field:'status', width:130, cellRenderer:statusRenderer, filter:true },
+    { headerName:'Runtime', field:'startTime', width:100, cellRenderer:runtimeRenderer },
+    { headerName:'Start Time', field:'startTime', width:175, cellRenderer:timeRenderer, columnGroupShow:'open' },
+    { headerName:'End Time', field:'endTime', width:175, cellRenderer:timeRenderer },
+    { headerName:'Host', field:'host', width:120, cellClass:'host-cell', filter:true },
+    { headerName:'Tag', field:'tag', width:90, cellClass:'tag-cell', filter:true },
+  );
+  return cols;
+}
+
+function shouldUseGrouping() {
+  return activeFilters.groups.length > 0 || activeFilters.projects.length > 0 ||
+    (activeFilters.groups.length === 0 && activeFilters.projects.length === 0);
+}
+
+function isExternalFilterPresent() {
+  return activeFilters.groups.length > 0 || activeFilters.projects.length > 0;
+}
+function doesExternalFilterPass(node) {
+  if (!node.data) return true;
+  const d = node.data;
+  if (activeFilters.groups.length && !activeFilters.groups.includes(d.group)) return false;
+  if (activeFilters.projects.length && !activeFilters.projects.includes(d.project)) return false;
+  return true;
+}
+
+let currentGroupingMode = true; // true = grouped, false = flat
+
+const gridOptions = {
+  columnDefs,
+  rowData: [],
+  groupDefaultExpanded: -1,
+  animateRows: true,
+  rowSelection: 'single',
+  suppressRowClickSelection: false,
+  groupDisplayType: 'groupRows',
+  autoGroupColumnDef: {
+    headerName: 'Group / Project', minWidth: 240, flex: 1,
+    cellRendererParams: { suppressCount: false },
+  },
+  getRowId: params => params.data ? params.data.id : undefined,
+  onSelectionChanged: () => {
+    const rows = gridApi.getSelectedRows();
+    selectedRow = rows.length > 0 ? rows[0] : null;
+    updateSelection();
+    startLogStream();
+  },
+  isExternalFilterPresent,
+  doesExternalFilterPass,
+  defaultColDef: { sortable:true, resizable:true, suppressMovable:true },
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  gridApi = agGrid.createGrid(document.getElementById('grid-container'), gridOptions);
+  refreshData();
+  setupLogResize();
+
+  // Refresh runtime column every second for active (non-terminal) rows
+  setInterval(() => {
+    // Main grid
+    if (gridApi && currentTab !== 'tasks') {
+      const rowsToRefresh = [];
+      gridApi.forEachNode(node => {
+        if (node.data && !isTerminalStatus(node.data.status) && node.data.startTime) {
+          rowsToRefresh.push(node);
+        }
+      });
+      if (rowsToRefresh.length > 0) {
+        gridApi.refreshCells({ rowNodes: rowsToRefresh, columns: ['startTime'], force: true });
+      }
+    }
+    // Tasks grids
+    if (currentTab === 'tasks') {
+      if (tasksParentGridApi) {
+        const pr = [];
+        tasksParentGridApi.forEachNode(n => { if (n.data && !isTerminalStatus(n.data.status) && n.data.startTime) pr.push(n); });
+        if (pr.length) tasksParentGridApi.refreshCells({ rowNodes: pr, columns: ['startTime'], force: true });
+      }
+      if (tasksChildGridApi) {
+        const cr = [];
+        tasksChildGridApi.forEachNode(n => { if (n.data && !isTerminalStatus(n.data.status) && n.data.startTime) cr.push(n); });
+        if (cr.length) tasksChildGridApi.refreshCells({ rowNodes: cr, columns: ['startTime'], force: true });
+      }
+    }
+  }, 1000);
+});
+
+// ═══ MULTI-SELECT DROPDOWN SYSTEM ═══
+const msSelections = { 'ms-group': [], 'ms-project': [] };
+
+function toggleMenu(id) {
+  const dropdown = document.getElementById(id);
+  const menu = dropdown.querySelector('.ms-menu');
+  const trigger = dropdown.querySelector('.ms-trigger');
+  const isOpen = menu.classList.contains('visible');
+
+  // Close all other menus
+  document.querySelectorAll('.ms-menu.visible').forEach(m => {
+    m.classList.remove('visible');
+    m.closest('.ms-dropdown').querySelector('.ms-trigger').classList.remove('open');
+  });
+
+  if (!isOpen) {
+    menu.classList.add('visible');
+    trigger.classList.add('open');
+  }
+}
+
+function toggleOption(dropdownId, value) {
+  const sel = msSelections[dropdownId];
+  const idx = sel.indexOf(value);
+  if (idx >= 0) sel.splice(idx, 1);
+  else sel.push(value);
+
+  // Update menu item visual
+  const dropdown = document.getElementById(dropdownId);
+  dropdown.querySelectorAll('.ms-menu-item').forEach(item => {
+    item.classList.toggle('selected', sel.includes(item.dataset.value));
+    item.querySelector('.ms-check').textContent = sel.includes(item.dataset.value) ? '✓' : '';
+  });
+
+  renderTrigger(dropdownId);
+  syncFiltersFromSelections();
+}
+
+function removeChip(e, dropdownId, value) {
+  e.stopPropagation();
+  toggleOption(dropdownId, value);
+}
+
+function renderTrigger(dropdownId) {
+  const sel = msSelections[dropdownId];
+  const trigger = document.getElementById(dropdownId).querySelector('.ms-trigger');
+
+  if (sel.length === 0) {
+    trigger.innerHTML = '<span class="ms-placeholder">All</span>';
+  } else {
+    let html = '';
+    const maxShow = 2;
+    sel.slice(0, maxShow).forEach(v => {
+      html += `<span class="ms-chip">${v}<span class="ms-chip-x" onclick="removeChip(event,'${dropdownId}','${v}')">×</span></span>`;
+    });
+    if (sel.length > maxShow) {
+      html += `<span class="ms-overflow">+${sel.length - maxShow}</span>`;
+    }
+    trigger.innerHTML = html;
+  }
+  // Re-add the caret
+  trigger.insertAdjacentHTML('beforeend', '');
+}
+
+function syncFiltersFromSelections() {
+  activeFilters.groups = [...msSelections['ms-group']];
+  activeFilters.projects = [...msSelections['ms-project']];
+  applyFilters();
+}
+
+// Close menus on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ms-dropdown')) {
+    document.querySelectorAll('.ms-menu.visible').forEach(m => {
+      m.classList.remove('visible');
+      m.closest('.ms-dropdown').querySelector('.ms-trigger').classList.remove('open');
+    });
+  }
+});
+
+// ═══ FILTERS ═══
+function applyFilters() {
+  if (currentTab === 'tasks') {
+    // Filter the tasks parent grid by applying external filter
+    if (tasksParentGridApi) {
+      tasksParentGridApi.onFilterChanged();
+    }
+    return;
+  }
+  // Check if grouping mode needs to change
+  const needGrouping = shouldUseGrouping();
+  if (needGrouping !== currentGroupingMode) {
+    currentGroupingMode = needGrouping;
+    const newCols = buildColumnDefs(needGrouping);
+    gridApi.setGridOption('columnDefs', newCols);
+  }
+  gridApi.onFilterChanged();
+  updateFilteredCounts();
+}
+function clearFilters() {
+  msSelections['ms-group'] = [];
+  msSelections['ms-project'] = [];
+  activeFilters = { groups: [], projects: [] };
+
+  ['ms-group', 'ms-project'].forEach(id => {
+    renderTrigger(id);
+    document.getElementById(id).querySelectorAll('.ms-menu-item').forEach(item => {
+      item.classList.remove('selected');
+      item.querySelector('.ms-check').textContent = '';
+    });
+  });
+  applyFilters();
+}
+function updateFilteredCounts() {
+  const items = [];
+  gridApi.forEachNodeAfterFilter(node => { if (node.data) items.push(node.data); });
+  updateFooter(items);
+}
+
+// ═══ REFRESH ═══
+function refreshData() {
+  if (currentTab === 'tasks') {
+    // Tasks view handles its own data
+    updateCounts();
+    document.getElementById('lane-label').textContent = `LANE: ${currentLane.toUpperCase()}`;
+    return;
+  }
+  const data = generateData(currentTab, currentLane);
+  gridApi.setGridOption('rowData', data);
+  const needGrouping = shouldUseGrouping();
+  if (needGrouping !== currentGroupingMode) {
+    currentGroupingMode = needGrouping;
+    gridApi.setGridOption('columnDefs', buildColumnDefs(needGrouping));
+  }
+  gridApi.onFilterChanged();
+  updateCounts();
+  updateFilteredCounts();
+  updateSelection();
+  document.getElementById('lane-label').textContent = `LANE: ${currentLane.toUpperCase()}`;
+}
+
+function updateSelection() {
+  const btns = ['btn-start','btn-stop','btn-restart','btn-ice','btn-manual'];
+  if (!selectedRow) {
+    btns.forEach(b => document.getElementById(b).disabled = true);
+  } else {
+    btns.forEach(b => document.getElementById(b).disabled = false);
+  }
+}
+
+function updateCounts() {
+  ['services','jobs'].forEach(tab => {
+    document.getElementById(`count-${tab}`).textContent = generateData(tab, currentLane).length;
+  });
+  // Tasks count comes from parent tasks, not generateData
+  document.getElementById('count-tasks').textContent = parentTasks.length || TASK_PARENT_NAMES.length;
+}
+
+function updateFooter(items) {
+  const counts = {};
+  BACKEND_CONFIG.statuses.forEach(s => { counts[s.name] = 0; });
+  items.forEach(i => { if (counts[i.status] !== undefined) counts[i.status]++; });
+  BACKEND_CONFIG.statuses.forEach(s => {
+    const el = document.getElementById(`stat-${s.name}`);
+    if (el) el.textContent = `${counts[s.name]} ${s.name}`;
+  });
+}
+
+// ═══ ACTIONS ═══
+function doAction(action) {
+  if (!selectedRow) return;
+  const actionCfg = BACKEND_CONFIG.actions[action];
+  if (!actionCfg) return;
+  const newStatus = actionCfg.resultStatus;
+  const labels = { start:'Started', stop:'Stopped', restart:'Restarting', ice:'Iced' };
+  const color = getStatusColor(newStatus);
+  selectedRow.status = newStatus;
+  if (!isTerminalStatus(newStatus)) { selectedRow.startTime = new Date(); selectedRow.endTime = null; }
+  if (isTerminalStatus(newStatus)) { selectedRow.endTime = new Date(); }
+  gridApi.applyTransaction({ update: [selectedRow] });
+  updateFooter(generateData(currentTab, currentLane));
+  showToast(`${labels[action] || action} ${selectedRow.fullPath}`, color);
+  appendLogLine('INFO', `Action [${action.toUpperCase()}] executed by operator`);
+}
+
+function showToast(msg, borderColor) {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  if (borderColor) t.style.borderColor = borderColor;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity 0.3s'; }, 2500);
+  setTimeout(() => { if (t.parentNode) c.removeChild(t); }, 2800);
+}
+
+function onSearch() {
+  gridApi.setGridOption('quickFilterText', document.getElementById('search-input').value.trim());
+}
+
+// ═══ RUN MANUAL DIALOG ═══
+// Default arguments per group/project — simulates what the backend provides as defaults
+const JOB_DEFAULT_ARGS = {
+  'core/entitlements': [
+    { key: 'as_of_date',       value: '' },
+    { key: 'scope',            value: 'full' },
+    { key: 'target_ou',        value: 'ou=trading,dc=corp' },
+    { key: 'dry_run',          value: 'false' },
+    { key: 'parallelism',      value: '4' },
+    { key: 'notify',           value: 'true' },
+    { key: 'skip_validation',  value: 'false' },
+  ],
+  'rates/swaps': [
+    { key: 'as_of_date',       value: '' },
+    { key: 'curve_set',        value: 'all' },
+    { key: 'valuation_ccy',    value: 'USD' },
+    { key: 'trade_filter',     value: '' },
+    { key: 'force_rebuild',    value: 'false' },
+    { key: 'include_expired',  value: 'false' },
+    { key: 'parallelism',      value: '8' },
+  ],
+  'fx/options': [
+    { key: 'as_of_date',       value: '' },
+    { key: 'ccy_pair',         value: 'all' },
+    { key: 'vol_source',       value: 'live' },
+    { key: 'pricing_model',    value: 'SABR' },
+    { key: 'greeks_mode',      value: 'full' },
+    { key: 'force_reprice',    value: 'false' },
+    { key: 'include_barriers', value: 'true' },
+  ],
+};
+
+let manualRunArgs = []; // current editable args in the dialog
+
+function openManualRunDialog() {
+  if (!selectedRow) return;
+  const backdrop = document.getElementById('manual-dialog-backdrop');
+  const body = document.getElementById('manual-dialog-body');
+  const path = document.getElementById('manual-dialog-path');
+
+  path.textContent = selectedRow.fullPath;
+
+  const gpKey = `${selectedRow.group}/${selectedRow.project}`;
+  const defaults = JOB_DEFAULT_ARGS[gpKey] || [];
+
+  // Deep copy defaults and fill in dynamic values
+  const dateStr = fmtDateKey(currentTab === 'jobs' ? jobDate : new Date());
+  manualRunArgs = defaults.map(a => {
+    const v = a.key === 'as_of_date' && !a.value ? dateStr : a.value;
+    return { key: a.key, value: v };
+  });
+
+  renderArgTable();
+  backdrop.classList.add('visible');
+}
+
+function renderArgTable() {
+  const body = document.getElementById('manual-dialog-body');
+  let html = `<table class="arg-table">
+    <thead><tr><th>Key</th><th>Value</th><th></th></tr></thead>
+    <tbody>`;
+
+  manualRunArgs.forEach((arg, i) => {
+    html += `<tr>
+      <td><input type="text" class="arg-key" value="${escHtml(arg.key)}" data-idx="${i}" data-field="key" onchange="updateArg(this)"></td>
+      <td><input type="text" value="${escHtml(arg.value)}" data-idx="${i}" data-field="value" onchange="updateArg(this)"></td>
+      <td><button class="arg-remove-btn" onclick="removeArg(${i})" title="Remove">×</button></td>
+    </tr>`;
+  });
+
+  html += `</tbody></table>
+    <div class="arg-add-row">
+      <button class="arg-add-btn" onclick="addArg()">+ Add Argument</button>
+    </div>`;
+
+  body.innerHTML = html;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function updateArg(el) {
+  const idx = parseInt(el.dataset.idx);
+  const field = el.dataset.field;
+  if (manualRunArgs[idx]) manualRunArgs[idx][field] = el.value;
+}
+
+function addArg() {
+  manualRunArgs.push({ key: '', value: '' });
+  renderArgTable();
+  // Focus the new key input
+  const inputs = document.querySelectorAll('.arg-table tbody tr:last-child td:first-child input');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}
+
+function removeArg(idx) {
+  manualRunArgs.splice(idx, 1);
+  renderArgTable();
+}
+
+function closeManualDialog(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('manual-dialog-backdrop').classList.remove('visible');
+}
+
+function executeManualRun() {
+  if (!selectedRow) return;
+
+  // Sync any pending input changes
+  document.querySelectorAll('.arg-table input').forEach(el => {
+    const idx = parseInt(el.dataset.idx);
+    const field = el.dataset.field;
+    if (manualRunArgs[idx]) manualRunArgs[idx][field] = el.value;
+  });
+
+  // Build args object from the table
+  const args = {};
+  manualRunArgs.forEach(a => {
+    if (a.key.trim()) args[a.key.trim()] = a.value;
+  });
+
+  // Update the row to running
+  const runStatus = BACKEND_CONFIG.actions.start.resultStatus;
+  selectedRow.status = runStatus;
+  selectedRow.startTime = new Date();
+  selectedRow.endTime = null;
+  if (args.tag_override) selectedRow.tag = args.tag_override;
+  if (args.host_override) selectedRow.host = args.host_override;
+
+  gridApi.applyTransaction({ update: [selectedRow] });
+  updateFooter(generateData(currentTab, currentLane));
+
+  // Build a summary of overrides for the toast
+  const overrides = Object.entries(args)
+    .filter(([k, v]) => v && v !== '')
+    .map(([k, v]) => `${k}=${v}`)
+    .slice(0, 3);
+  const summary = overrides.length ? ` [${overrides.join(', ')}]` : '';
+
+  closeManualDialog();
+  showToast(`Manual run started: ${selectedRow.fullPath}${summary}`, getStatusColor(runStatus));
+  appendLogLine('INFO', `Manual run initiated by operator — args: ${JSON.stringify(args)}`);
+  startLogStream();
+}
+
+// ═══ LOG SYSTEM ═══
+const LOG_MESSAGES = {
+  'core/entitlements': {
+    INFO: [
+      'Policy evaluation completed in 12ms — result: ALLOW',
+      'Role cache refreshed — 342 entries loaded from LDAP',
+      'Token introspection passed for subject cn=svc-trade-engine',
+      'Delegation chain resolved: 3 hops, final authority=admin',
+      'Session heartbeat received from nyc-app-02',
+      'Permission grant persisted to policy store — grantId=G-88201',
+      'Scope validation passed for oauth2 client risk-dashboard',
+      'Audit event flushed to Kafka partition 7',
+      'Entitlement sync batch completed — 18 accounts processed',
+      'Claim mapping applied: department → cost-center',
+    ],
+    WARN: [
+      'Role resolution took 480ms — exceeds 200ms SLA threshold',
+      'LDAP connection pool at 85% capacity — consider scaling',
+      'Stale delegation detected for cn=svc-legacy-feed — expires in 2h',
+      'Permission cache miss rate elevated: 12.4%',
+      'Token refresh approaching rate limit — 890/1000 used',
+    ],
+    ERROR: [
+      'Policy evaluation failed — circular dependency in role graph',
+      'LDAP bind timeout after 5000ms — retrying with fallback',
+      'Token introspection rejected — certificate CN mismatch',
+      'Audit sink backpressure — Kafka partition 3 unresponsive',
+    ],
+    DEBUG: [
+      'Evaluating policy node: /core/entitlements/trading/write',
+      'Cache key hash: 0x7fa3b2c1 — TTL remaining: 184s',
+      'LDAP search filter: (&(objectClass=person)(ou=trading))',
+      'JWT claims extracted: iss=identity-provider, aud=risk-api',
+    ],
+  },
+  'rates/swaps': {
+    INFO: [
+      'Curve build completed: USD-SOFR-3M — 42 tenors, 8ms',
+      'Fixing published: SOFR=5.33% as-of 2024-01-15T16:00Z',
+      'Valuation engine processed 1,204 trades in batch — total PV: $42.8M',
+      'Cashflow projection generated through 2054-06-15',
+      'Reset monitor confirmed: all LIBOR transitions complete',
+      'Spread calculation: USD-SOFR vs EUR-ESTR = 142.5bps',
+      'Netting set NS-4421 aggregated — 38 trades, net PV: $2.1M',
+      'Benchmark tracker: SOFR term structure updated, 12 tenors',
+      'Collateral margin call computed — variation margin: $850K',
+      'Trade lifecycle: IRS-20240115-001 rolled to next period',
+    ],
+    WARN: [
+      'Curve build fallback: SONIA-6M using interpolated input — 2 quotes missing',
+      'Fixing source latency: Bloomberg feed delayed 340ms',
+      'PV sensitivity exceeds threshold for IRS-20231201-042 — delta=$12.4M/bp',
+      'Reset rate lookup cache miss — fetching from persistence',
+      'Tenor resolver: 18M point extrapolated beyond observable range',
+    ],
+    ERROR: [
+      'Curve build failed: JPY-TONAR — insufficient market data for bootstrap',
+      'Valuation engine timeout: batch exceeded 30s SLA',
+      'Cashflow projection error: amortization schedule corrupt for trade T-92013',
+      'Netting aggregation mismatch: counterparty CP-1180 has orphan legs',
+    ],
+    DEBUG: [
+      'Bootstrap iteration 14: max residual = 2.3e-12',
+      'Interpolation method: monotone convex on log-discount',
+      'Trade T-88402: accrual period 2024-01-15 to 2024-04-15, dcf=0.2472',
+      'Spread decomposition: credit=82bps, liquidity=41bps, basis=19.5bps',
+    ],
+  },
+  'fx/options': {
+    INFO: [
+      'Vol surface built: EURUSD — 8 expiries × 5 deltas, fit residual 0.02%',
+      'Vanilla pricer: EURUSD 1.0850 Call 3M — premium 1.42%, delta 0.48',
+      'Barrier pricer: USDJPY 155.00 KO Put — premium 0.38%',
+      'Greeks batch completed: 892 positions, 14ms total',
+      'Smile interpolation: GBPUSD 1M ATM vol = 7.82%',
+      'Expiry monitor: 23 options expiring today, 8 ITM',
+      'Delta hedger: net EURUSD delta neutralized — traded 2.4M spot',
+      'Market feed connected: Reuters tick stream — latency 2.1ms',
+      'Strike resolver: AUDUSD 0.6650P mapped to 25D put',
+      'Payoff evaluator: double-no-touch validated — corridor 1.0700–1.1050',
+    ],
+    WARN: [
+      'Vol surface: USDMXN far wing extrapolation may be unstable',
+      'Barrier monitor: USDJPY spot within 0.3% of 155.00 KO level',
+      'Greeks calculation: vega bucketing exceeds memory threshold',
+      'Smile interpolation: negative butterfly spread detected at 1W EURUSD',
+      'Market feed reconnecting: Reuters stream dropped — attempting backup',
+    ],
+    ERROR: [
+      'Vol surface build failed: USDTRY — stale quotes older than 4h',
+      'Pricer exception: negative implied vol for EURGBP 6M 10D put',
+      'Delta hedger blocked: insufficient credit limit for spot execution',
+      'Market feed timeout: no ticks received for 15s on GBPUSD',
+    ],
+    DEBUG: [
+      'SABR calibration: alpha=0.0432, rho=-0.218, nu=0.587, beta=0.5',
+      'Barrier PDE grid: 200 spot steps × 150 time steps',
+      'Delta ladder: 10D=0.12, 25D=0.31, ATM=0.48, 25D=0.67, 10D=0.84',
+      'Vol interpolation: flat fwd variance between 2W and 1M',
+    ],
+  },
+};
+
+const LOG_LEVELS = ['INFO','INFO','INFO','INFO','INFO','WARN','WARN','DEBUG','DEBUG','ERROR'];
+let logLines = [];
+let logLineCounter = 0;
+
+function generateInitialLog(item) {
+  if (!item) return [];
+  const gpKey = `${item.group}/${item.project}`;
+  const msgs = LOG_MESSAGES[gpKey] || (gpKey === 'compute/farm' ? TASK_LOG_MSGS : null);
+  if (!msgs) return [];
+  const lines = [];
+  const now = Date.now();
+  const rng = seededRandom(item.id.split('').reduce((a,c) => a + c.charCodeAt(0), 0));
+  const count = 25 + Math.floor(rng() * 30);
+  for (let i = 0; i < count; i++) {
+    const ts = new Date(now - (count - i) * (800 + Math.floor(rng() * 3000)));
+    const level = pick(LOG_LEVELS, rng);
+    const msg = pick(msgs[level], rng);
+    lines.push({ ts, level, msg, num: ++logLineCounter });
+  }
+  return lines;
+}
+
+function generateNewLogLine(item) {
+  if (!item) return null;
+  const gpKey = `${item.group}/${item.project}`;
+  const msgs = LOG_MESSAGES[gpKey] || (gpKey === 'compute/farm' ? TASK_LOG_MSGS : null);
+  if (!msgs) return null;
+  const level = pick(LOG_LEVELS, Math);
+  const msg = pick(msgs[level], Math);
+  return { ts: new Date(), level, msg, num: ++logLineCounter };
+}
+
+function renderLogLine(line) {
+  return `<div class="log-line"><span class="log-ts">${fmtTimeShort(line.ts)}</span><span class="log-lvl ${line.level}">${line.level.padEnd(5)}</span><span class="log-msg">${line.msg}</span></div>`;
+}
+
+function renderLogBody(container, lines) {
+  if (!lines.length) {
+    container.innerHTML = '<div class="log-empty">Select a service, job, or task to view logs</div>';
+    return;
+  }
+  container.innerHTML = lines.map(renderLogLine).join('');
+}
+
+function appendLogLine(level, msg) {
+  if (!selectedRow) return;
+  const line = { ts: new Date(), level, msg, num: ++logLineCounter };
+  logLines.push(line);
+  if (logLines.length > 500) logLines = logLines.slice(-400);
+
+  const html = renderLogLine(line);
+  const logBody = document.getElementById('log-body');
+  if (logBody.querySelector('.log-empty')) logBody.innerHTML = '';
+  logBody.insertAdjacentHTML('beforeend', html);
+  if (logTailing) logBody.scrollTop = logBody.scrollHeight;
+
+  const overlayBody = document.getElementById('log-overlay-body');
+  if (document.getElementById('log-overlay').classList.contains('visible')) {
+    overlayBody.insertAdjacentHTML('beforeend', html);
+    if (overlayTailing) overlayBody.scrollTop = overlayBody.scrollHeight;
+  }
+}
+
+function startLogStream() {
+  if (logInterval) { clearInterval(logInterval); logInterval = null; }
+  logLineCounter = 0;
+
+  const logBody = document.getElementById('log-body');
+  const pathLabel = document.getElementById('log-path-label');
+  const panel = document.getElementById('log-panel');
+  const handle = document.getElementById('log-resize-handle');
+
+  if (!selectedRow) {
+    logLines = [];
+    renderLogBody(logBody, []);
+    pathLabel.textContent = '—';
+    // Hide the log panel entirely
+    panel.classList.remove('collapsed', 'expanded');
+    panel.classList.add('hidden');
+    handle.classList.add('hidden');
+    return;
+  }
+
+  // Show the log panel
+  panel.classList.remove('hidden', 'collapsed');
+  panel.classList.add('expanded');
+  handle.classList.remove('hidden');
+
+  pathLabel.textContent = selectedRow.fullPath;
+  document.getElementById('log-overlay-path').textContent = selectedRow.fullPath;
+
+  // Generate initial log history
+  logLines = generateInitialLog(selectedRow);
+  renderLogBody(logBody, logLines);
+  if (logTailing) logBody.scrollTop = logBody.scrollHeight;
+
+  // Sync overlay if open
+  const overlayBody = document.getElementById('log-overlay-body');
+  if (document.getElementById('log-overlay').classList.contains('visible')) {
+    renderLogBody(overlayBody, logLines);
+    if (overlayTailing) overlayBody.scrollTop = overlayBody.scrollHeight;
+  }
+
+  // Start tailing — only for running/pending
+  if (isActiveStatus(selectedRow.status)) {
+    logInterval = setInterval(() => {
+      if (!selectedRow) return;
+      const line = generateNewLogLine(selectedRow);
+      if (line) {
+        logLines.push(line);
+        if (logLines.length > 500) logLines = logLines.slice(-400);
+        const html = renderLogLine(line);
+        logBody.insertAdjacentHTML('beforeend', html);
+        if (logTailing) logBody.scrollTop = logBody.scrollHeight;
+
+        if (document.getElementById('log-overlay').classList.contains('visible')) {
+          overlayBody.insertAdjacentHTML('beforeend', html);
+          if (overlayTailing) overlayBody.scrollTop = overlayBody.scrollHeight;
+        }
+      }
+    }, 800 + Math.random() * 1500);
+  }
+}
+
+// ═══ LOG PANEL CONTROLS ═══
+document.getElementById('log-header').addEventListener('click', e => {
+  if (e.target.closest('.log-ctrl-btn')) return;
+  const panel = document.getElementById('log-panel');
+  if (panel.classList.contains('hidden')) return;
+  panel.classList.toggle('collapsed');
+  panel.classList.toggle('expanded');
+});
+
+function toggleTail(e) {
+  e.stopPropagation();
+  logTailing = !logTailing;
+  document.getElementById('log-tail-btn').classList.toggle('active', logTailing);
+  if (logTailing) {
+    document.getElementById('log-body').scrollTop = document.getElementById('log-body').scrollHeight;
+  }
+}
+
+function openLogOverlay(e) {
+  e.stopPropagation();
+  const overlay = document.getElementById('log-overlay');
+  overlay.classList.add('visible');
+  const overlayBody = document.getElementById('log-overlay-body');
+  renderLogBody(overlayBody, logLines);
+  document.getElementById('log-overlay-path').textContent =
+    selectedRow ? selectedRow.fullPath : '—';
+  overlayTailing = true;
+  document.getElementById('log-overlay-tail-btn').classList.add('active');
+  if (overlayTailing) overlayBody.scrollTop = overlayBody.scrollHeight;
+}
+
+function closeLogOverlay() {
+  document.getElementById('log-overlay').classList.remove('visible');
+}
+
+function toggleOverlayTail(e) {
+  e.stopPropagation();
+  overlayTailing = !overlayTailing;
+  document.getElementById('log-overlay-tail-btn').classList.toggle('active', overlayTailing);
+  if (overlayTailing) {
+    document.getElementById('log-overlay-body').scrollTop = document.getElementById('log-overlay-body').scrollHeight;
+  }
+}
+
+// ═══ LOG RESIZE ═══
+function setupLogResize() {
+  const handle = document.getElementById('log-resize-handle');
+  const panel = document.getElementById('log-panel');
+  let startY, startH;
+
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault();
+    startY = e.clientY;
+    startH = panel.offsetHeight;
+    handle.classList.add('active');
+
+    const onMove = e2 => {
+      const delta = startY - e2.clientY;
+      const newH = Math.max(100, Math.min(window.innerHeight * 0.6, startH + delta));
+      panel.style.height = newH + 'px';
+      panel.classList.remove('collapsed', 'expanded');
+    };
+    const onUp = () => {
+      handle.classList.remove('active');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+// ═══ TABS ═══
+function updateDatePickerVisibility() {
+  document.getElementById('job-date-picker').classList.toggle('visible', currentTab === 'jobs');
+}
+
+function updateViewVisibility() {
+  const isTasksTab = currentTab === 'tasks';
+  document.getElementById('main-grid-wrapper').style.display = isTasksTab ? 'none' : '';
+  document.getElementById('tasks-view').classList.toggle('visible', isTasksTab);
+  if (isTasksTab) {
+    initTasksView();
+  } else {
+    stopTasksWebSocket();
+  }
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTab = btn.dataset.tab;
+    selectedRow = null;
+    startLogStream();
+    updateDatePickerVisibility();
+    updateViewVisibility();
+    refreshData();
+  });
+});
+
+// ═══ TASKS SYSTEM ═══
+const TASK_PARENT_NAMES = [
+  'risk-aggregation-batch', 'eod-pnl-attribution', 'vol-surface-calibration',
+  'monte-carlo-var-sim', 'stress-test-scenario-run', 'greeks-recalc-full',
+  'margin-call-compute', 'collateral-optimization', 'trade-confirm-matching',
+  'cashflow-projection-sweep', 'counterparty-exposure-calc', 'curve-bootstrap-full',
+  'fx-barrier-revalue', 'portfolio-rebalance-calc', 'settlement-netting-run',
+];
+
+const TASK_LOG_MSGS = {
+  INFO: [
+    'Subtask partition assigned — chunk size: 500 records',
+    'Worker node acknowledged — processing started',
+    'Intermediate results flushed to shared store',
+    'Checkpoint saved — resumable from offset 42800',
+    'Subtask completed — elapsed: 12.4s, records: 500',
+    'Result aggregation in progress — 85% complete',
+    'Memory usage: 2.1GB / 4GB allocated',
+    'Heartbeat received from compute node',
+  ],
+  WARN: [
+    'Subtask execution slower than expected — SLA threshold approaching',
+    'Worker node memory pressure detected — 92% utilized',
+    'Retry attempt 2/3 for partition 17',
+    'Network latency spike to orchestrator — 340ms',
+  ],
+  ERROR: [
+    'Subtask failed — OutOfMemoryError on compute node',
+    'Timeout waiting for intermediate results — 30s exceeded',
+    'Worker node lost — connection reset by peer',
+  ],
+  DEBUG: [
+    'Partition key hash: 0x3fa9b2 — assigned to worker-07',
+    'Serialization overhead: 1.2ms per record',
+    'GC pause: 45ms — within acceptable threshold',
+  ],
+};
+
+let tasksParentGridApi = null;
+let tasksChildGridApi = null;
+let selectedParentTask = null;
+let selectedChildTask = null;
+let tasksWsInterval = null;
+let parentTasks = [];
+let childTasks = [];
+
+function generateParentTasks(lane) {
+  const seed = 'tasks'.charCodeAt(0)*1000 + lane.charCodeAt(0)*100 + lane.charCodeAt(1);
+  const rng = seededRandom(seed);
+  const count = 8 + Math.floor(rng() * 5);
+  const shuffled = [...TASK_PARENT_NAMES].sort(() => rng() - 0.5);
+  const selected = shuffled.slice(0, count);
+  return selected.map((name, i) => {
+    const gp = GROUP_PROJECTS[i % GROUP_PROJECTS.length];
+    const subtaskCount = 20 + Math.floor(rng() * 80);
+    const status = pick(['running','running','completed','completed','completed','failed','pending'], rng);
+    const startTime = new Date(Date.now() - Math.floor(rng() * 24 * 3600000));
+    let endTime = null;
+    if (isTerminalStatus(status)) endTime = new Date(startTime.getTime() + Math.floor(rng() * 3600000));
+    const completedCount = isTerminalStatus(status) ? subtaskCount : Math.floor(rng() * subtaskCount * 0.8);
+    const failedCount = status === 'failed' ? Math.floor(rng() * 5) + 1 : 0;
+    const runningCount = isActiveStatus(status) ? Math.min(subtaskCount - completedCount - failedCount, Math.floor(rng() * 8) + 1) : 0;
+    return {
+      id: `task-parent-${lane}-${i}`,
+      name, subtaskCount, status, startTime, endTime,
+      host: pick(HOSTS, rng), tag: pick(TAGS_MAP[lane], rng),
+      completedCount, failedCount, runningCount,
+      fullPath: name,
+      group: gp.group, project: gp.project,
+    };
+  });
+}
+
+function generateChildTasks(parent, lane) {
+  const seed = parent.id.split('').reduce((a,c) => a + c.charCodeAt(0), 0);
+  const rng = seededRandom(seed);
+  const tasks = [];
+  for (let i = 0; i < parent.subtaskCount; i++) {
+    let status;
+    if (i < parent.completedCount - parent.failedCount) status = 'completed';
+    else if (i < parent.completedCount) status = 'failed';
+    else if (i < parent.completedCount + parent.runningCount) status = 'running';
+    else status = 'pending';
+    const startTime = status === 'pending' ? null : new Date(parent.startTime.getTime() + Math.floor(rng() * 600000));
+    let endTime = null;
+    if (isTerminalStatus(status) && startTime) endTime = new Date(startTime.getTime() + Math.floor(rng() * 120000));
+    tasks.push({
+      id: `${parent.id}-sub-${i}`,
+      name: `${parent.name}:${String(i).padStart(3, '0')}`,
+      index: i, status, startTime, endTime,
+      host: pick(HOSTS, rng),
+      fullPath: `${parent.name}:${String(i).padStart(3, '0')}`,
+      group: 'compute', project: 'farm',
+      parentId: parent.id,
+    });
+  }
+  return tasks;
+}
+
+function initTasksView() {
+  parentTasks = generateParentTasks(currentLane);
+
+  if (!tasksParentGridApi) {
+    const parentEl = document.getElementById('tasks-parent-grid-container');
+    parentEl.classList.add(isDark ? 'ag-theme-alpine-dark' : 'ag-theme-alpine');
+    tasksParentGridApi = agGrid.createGrid(parentEl, {
+      columnDefs: [
+        { headerName:'Group', field:'group', width: 90, cellClass:'tag-cell', filter: true },
+        { headerName:'Project', field:'project', width: 110, cellClass:'tag-cell', filter: true },
+        { headerName:'Task Name', field:'name', flex: 2, minWidth: 200, cellClass:'path-cell', filter: true },
+        { headerName:'Status', field:'status', width: 120, cellRenderer: statusRenderer },
+        { headerName:'Subtasks', field:'subtaskCount', width: 90, cellClass:'time-cell' },
+        { headerName:'Done', field:'completedCount', width: 70, cellClass:'time-cell' },
+        { headerName:'Failed', field:'failedCount', width: 70, cellClass:'time-cell' },
+        { headerName:'Runtime', field:'startTime', width: 90, cellRenderer: runtimeRenderer },
+        { headerName:'Host', field:'host', width: 110, cellClass:'host-cell' },
+      ],
+      rowData: parentTasks,
+      rowSelection: 'single',
+      animateRows: true,
+      getRowId: p => p.data.id,
+      onSelectionChanged: () => {
+        const rows = tasksParentGridApi.getSelectedRows();
+        selectedParentTask = rows.length > 0 ? rows[0] : null;
+        selectedChildTask = null;
+        selectedRow = null;
+        onParentTaskSelected();
+      },
+      defaultColDef: { sortable: true, resizable: true, suppressMovable: true },
+      isExternalFilterPresent,
+      doesExternalFilterPass,
+    });
+  } else {
+    const parentEl = document.getElementById('tasks-parent-grid-container');
+    parentEl.classList.remove('ag-theme-alpine', 'ag-theme-alpine-dark');
+    parentEl.classList.add(isDark ? 'ag-theme-alpine-dark' : 'ag-theme-alpine');
+    tasksParentGridApi.setGridOption('rowData', parentTasks);
+  }
+
+  if (!tasksChildGridApi) {
+    const childEl = document.getElementById('tasks-child-grid-container');
+    childEl.classList.add(isDark ? 'ag-theme-alpine-dark' : 'ag-theme-alpine');
+    tasksChildGridApi = agGrid.createGrid(childEl, {
+      columnDefs: [
+        { headerName:'Subtask', field:'name', flex: 2, minWidth: 180, cellClass:'path-cell', filter: true },
+        { headerName:'Status', field:'status', width: 120, cellRenderer: statusRenderer },
+        { headerName:'Runtime', field:'startTime', width: 90, cellRenderer: runtimeRenderer },
+        { headerName:'Start Time', field:'startTime', width: 165, cellRenderer: timeRenderer },
+        { headerName:'End Time', field:'endTime', width: 165, cellRenderer: timeRenderer },
+        { headerName:'Host', field:'host', width: 110, cellClass:'host-cell' },
+      ],
+      rowData: [],
+      rowSelection: 'single',
+      animateRows: true,
+      getRowId: p => p.data.id,
+      onSelectionChanged: () => {
+        const rows = tasksChildGridApi.getSelectedRows();
+        selectedChildTask = rows.length > 0 ? rows[0] : null;
+        if (selectedChildTask) {
+          selectedRow = selectedChildTask;
+          startLogStream();
+          highlightHeatmapCell(selectedChildTask.index);
+        } else {
+          selectedRow = null;
+          startLogStream();
+          highlightHeatmapCell(-1);
+        }
+      },
+      defaultColDef: { sortable: true, resizable: true, suppressMovable: true },
+    });
+  } else {
+    const childEl = document.getElementById('tasks-child-grid-container');
+    childEl.classList.remove('ag-theme-alpine', 'ag-theme-alpine-dark');
+    childEl.classList.add(isDark ? 'ag-theme-alpine-dark' : 'ag-theme-alpine');
+  }
+
+  document.getElementById('tasks-heatmap-wrapper').style.display = 'none';
+  selectedParentTask = null;
+  selectedChildTask = null;
+  childTasks = [];
+  tasksChildGridApi.setGridOption('rowData', []);
+  startLogStream();
+}
+
+function onParentTaskSelected() {
+  const heatmapWrapper = document.getElementById('tasks-heatmap-wrapper');
+  if (!selectedParentTask) {
+    childTasks = [];
+    tasksChildGridApi.setGridOption('rowData', []);
+    heatmapWrapper.style.display = 'none';
+    document.getElementById('child-label').textContent = 'Subtasks';
+    startLogStream();
+    return;
+  }
+
+  document.getElementById('child-label').textContent = `Subtasks — ${selectedParentTask.name}`;
+  childTasks = generateChildTasks(selectedParentTask, currentLane);
+  tasksChildGridApi.setGridOption('rowData', childTasks);
+  heatmapWrapper.style.display = '';
+  renderHeatmap();
+  startTasksWebSocket();
+}
+
+// ═══ HEATMAP ═══
+function renderHeatmap() {
+  const body = document.getElementById('heatmap-body');
+  if (!childTasks.length) { body.innerHTML = ''; return; }
+
+  const counts = { pending: 0, running: 0, completed: 0, failed: 0 };
+  let html = '';
+  childTasks.forEach((t, i) => {
+    const s = t.status;
+    if (counts[s] !== undefined) counts[s]++;
+    html += `<div class="hm-cell ${s}" data-idx="${i}" title="${t.name}" onmouseenter="showHmTooltip(event,${i})" onmouseleave="hideHmTooltip()" onclick="selectHeatmapCell(${i})"></div>`;
+  });
+  body.innerHTML = html;
+
+  document.getElementById('heatmap-stats').textContent =
+    `${counts.completed}✓ ${counts.running}● ${counts.failed}✗ ${counts.pending}○`;
+}
+
+function highlightHeatmapCell(idx) {
+  document.querySelectorAll('.hm-cell.selected').forEach(c => c.classList.remove('selected'));
+  if (idx >= 0) {
+    const cell = document.querySelector(`.hm-cell[data-idx="${idx}"]`);
+    if (cell) cell.classList.add('selected');
+  }
+}
+
+function selectHeatmapCell(idx) {
+  if (idx < 0 || idx >= childTasks.length) return;
+  const task = childTasks[idx];
+  selectedChildTask = task;
+  selectedRow = task;
+
+  // Select in child grid too
+  tasksChildGridApi.forEachNode(node => {
+    if (node.data && node.data.index === idx) node.setSelected(true);
+    else node.setSelected(false);
+  });
+  // Ensure visible
+  tasksChildGridApi.ensureIndexVisible(idx);
+
+  highlightHeatmapCell(idx);
+  startLogStream();
+}
+
+function showHmTooltip(e, idx) {
+  const t = childTasks[idx];
+  if (!t) return;
+  const tip = document.getElementById('hm-tooltip');
+  tip.textContent = `${t.name} — ${t.status}`;
+  tip.style.left = (e.clientX + 12) + 'px';
+  tip.style.top = (e.clientY - 8) + 'px';
+  tip.classList.add('visible');
+}
+function hideHmTooltip() {
+  document.getElementById('hm-tooltip').classList.remove('visible');
+}
+
+// ═══ SIMULATED WEBSOCKET ═══
+function startTasksWebSocket() {
+  stopTasksWebSocket();
+  if (!selectedParentTask || isTerminalStatus(selectedParentTask.status)) return;
+
+  tasksWsInterval = setInterval(() => {
+    if (!selectedParentTask || !childTasks.length) return;
+
+    // Find next pending or running subtask to advance
+    let changed = false;
+    for (let i = 0; i < childTasks.length; i++) {
+      const t = childTasks[i];
+      if (t.status === 'pending' && Math.random() < 0.15) {
+        t.status = 'running';
+        t.startTime = new Date();
+        changed = true;
+        break;
+      }
+      if (t.status === 'running' && Math.random() < 0.2) {
+        t.status = Math.random() < 0.92 ? 'completed' : 'failed';
+        t.endTime = new Date();
+        changed = true;
+
+        // Update parent counts
+        if (t.status === 'completed') selectedParentTask.completedCount++;
+        if (t.status === 'failed') { selectedParentTask.failedCount++; selectedParentTask.completedCount++; }
+        selectedParentTask.runningCount = childTasks.filter(c => c.status === 'running').length;
+
+        // Check if parent is done
+        const allDone = childTasks.every(c => isTerminalStatus(c.status));
+        if (allDone) {
+          const anyFailed = childTasks.some(c => c.status === 'failed');
+          selectedParentTask.status = anyFailed ? 'failed' : 'completed';
+          selectedParentTask.endTime = new Date();
+          tasksParentGridApi.applyTransaction({ update: [selectedParentTask] });
+          stopTasksWebSocket();
+        } else {
+          tasksParentGridApi.applyTransaction({ update: [selectedParentTask] });
+        }
+        break;
+      }
+    }
+
+    if (changed) {
+      tasksChildGridApi.applyTransaction({ update: childTasks.filter((_, i) => true) });
+      renderHeatmap();
+      // Re-highlight if a child was selected
+      if (selectedChildTask) highlightHeatmapCell(selectedChildTask.index);
+    }
+  }, 600);
+}
+
+function stopTasksWebSocket() {
+  if (tasksWsInterval) { clearInterval(tasksWsInterval); tasksWsInterval = null; }
+}
+
+// ═══ JOB DATE PICKER ═══
+function initJobDatePicker() {
+  const input = document.getElementById('job-date-input');
+  input.value = fmtDateKey(jobDate);
+  input.addEventListener('change', e => {
+    const parts = e.target.value.split('-');
+    jobDate = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+    selectedRow = null;
+    startLogStream();
+    refreshData();
+  });
+}
+
+function shiftJobDate(delta) {
+  jobDate = new Date(jobDate.getFullYear(), jobDate.getMonth(), jobDate.getDate() + delta);
+  document.getElementById('job-date-input').value = fmtDateKey(jobDate);
+  selectedRow = null;
+  startLogStream();
+  refreshData();
+}
+
+// ═══ LANE ═══
+document.getElementById('lane-select').addEventListener('change', e => {
+  currentLane = e.target.value;
+  selectedRow = null;
+  startLogStream();
+  refreshData();
+});
+
+// ═══ CLOCK ═══
+function updateClock() {
+  const now = new Date();
+  const p = n => String(n).padStart(2,'0');
+  const tz = now.getTimezoneOffset();
+  document.getElementById('clock').textContent =
+    `${now.getFullYear()}-${p(now.getMonth()+1)}-${p(now.getDate())} ${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())} UTC${tz<=0?'+':'-'}${p(Math.abs(Math.floor(tz/60)))}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ═══ KEYBOARD ═══
+document.addEventListener('keydown', e => {
+  if (e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
+  if (e.key==='1') document.querySelector('[data-tab="services"]').click();
+  if (e.key==='2') document.querySelector('[data-tab="jobs"]').click();
+  if (e.key==='3') document.querySelector('[data-tab="tasks"]').click();
+  if (e.key==='/'||(e.key==='f'&&(e.metaKey||e.ctrlKey))) { e.preventDefault(); document.getElementById('search-input').focus(); }
+  if (e.key==='Escape') {
+    if (document.getElementById('log-overlay').classList.contains('visible')) {
+      closeLogOverlay(); return;
+    }
+    selectedRow = null;
+    if (currentTab === 'tasks') {
+      selectedChildTask = null;
+      selectedParentTask = null;
+      if (tasksChildGridApi) tasksChildGridApi.deselectAll();
+      if (tasksParentGridApi) tasksParentGridApi.deselectAll();
+      highlightHeatmapCell(-1);
+    } else {
+      gridApi.deselectAll();
+    }
+    document.getElementById('search-input').blur();
+    document.getElementById('search-input').value = '';
+    if (currentTab !== 'tasks') gridApi.setGridOption('quickFilterText', '');
+    updateSelection();
+    startLogStream();
+  }
+});
+
+// ═══ INIT ═══
+initJobDatePicker();
+</script>
+</body>
+</html>
