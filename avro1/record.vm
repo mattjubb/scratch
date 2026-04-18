@@ -1,0 +1,484 @@
+##
+## Custom Avro record.vm template
+## Generates immutable records using Eclipse Collections
+##
+## Key changes from default:
+##   - Fields are final
+##   - No setters
+##   - java.util.List -> ImmutableList (Eclipse Collections)
+##   - java.util.Map  -> ImmutableMap  (Eclipse Collections)
+##   - Constructor defensively copies into EC immutable types
+##   - Builder pattern for construction
+##   - Avro-compatible conversion methods for serialization
+##
+#if ($schema.getNamespace())
+package $schema.getNamespace();
+#end
+
+import org.apache.avro.Schema;
+import org.apache.avro.SchemaBuilder;
+import org.apache.avro.specific.SpecificData;
+import org.apache.avro.specific.SpecificRecord;
+import org.apache.avro.specific.SpecificRecordBase;
+import org.apache.avro.message.BinaryMessageEncoder;
+import org.apache.avro.message.BinaryMessageDecoder;
+import org.apache.avro.message.SchemaStore;
+import org.apache.avro.io.DatumReader;
+import org.apache.avro.io.DatumWriter;
+import org.apache.avro.generic.GenericRecord;
+
+import org.eclipse.collections.api.list.ImmutableList;
+import org.eclipse.collections.api.map.ImmutableMap;
+import org.eclipse.collections.impl.factory.Lists;
+import org.eclipse.collections.impl.factory.Maps;
+
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+
+/**
+ * Immutable Avro record: ${schema.getName()}.
+#if ($schema.getDoc())
+ * <p>${schema.getDoc()}</p>
+#end
+ *
+ * <p>All collection fields use Eclipse Collections immutable types.
+ * Use the {@link Builder} to construct instances.</p>
+ *
+ * <p>Auto-generated from Avro schema — do not edit directly.</p>
+ */
+@org.apache.avro.specific.AvroGenerated
+public final class ${schema.getName()} extends SpecificRecordBase implements SpecificRecord {
+
+  private static final long serialVersionUID = 1L;
+
+  public static final Schema SCHEMA$ = new Schema.Parser().parse(
+    "${schema.toString().replace("\"", "\\\"").replace("\n", "\\n")}"
+  );
+
+  public static Schema getClassSchema() {
+    return SCHEMA$;
+  }
+
+  private static final SpecificData MODEL$ = new SpecificData();
+
+  private static final BinaryMessageEncoder<${schema.getName()}> ENCODER =
+      new BinaryMessageEncoder<>(MODEL$, SCHEMA$);
+
+  private static final BinaryMessageDecoder<${schema.getName()}> DECODER =
+      new BinaryMessageDecoder<>(MODEL$, SCHEMA$);
+
+  public static BinaryMessageEncoder<${schema.getName()}> getEncoder() {
+    return ENCODER;
+  }
+
+  public static BinaryMessageDecoder<${schema.getName()}> getDecoder() {
+    return DECODER;
+  }
+
+  public static ${schema.getName()} fromByteBuffer(ByteBuffer b) throws java.io.IOException {
+    return DECODER.decode(b);
+  }
+
+  public ByteBuffer toByteBuffer() throws java.io.IOException {
+    return ENCODER.encode(this);
+  }
+
+  // ───────────────────────────────────────────────
+  // Fields (all final)
+  // ───────────────────────────────────────────────
+#foreach ($field in $schema.getFields())
+#set ($ecType = false)
+#set ($isList = false)
+#set ($isMap = false)
+#set ($fieldSchema = $field.schema())
+## Handle unions — unwrap [null, X]
+#if ($fieldSchema.getType().getName() == "union")
+#foreach ($unionType in $fieldSchema.getTypes())
+#if ($unionType.getType().getName() != "null")
+#set ($fieldSchema = $unionType)
+#end
+#end
+#end
+## Check if array -> ImmutableList
+#if ($fieldSchema.getType().getName() == "array")
+#set ($isList = true)
+#set ($itemType = $this.javaType($fieldSchema.getElementType()))
+#set ($javaType = "ImmutableList<${itemType}>")
+#set ($ecType = true)
+## Check if map -> ImmutableMap
+#elseif ($fieldSchema.getType().getName() == "map")
+#set ($isMap = true)
+#set ($valueType = $this.javaType($fieldSchema.getValueType()))
+#set ($javaType = "ImmutableMap<String, ${valueType}>")
+#set ($ecType = true)
+#else
+#set ($javaType = $this.javaType($fieldSchema))
+#end
+## For nullable fields, keep the type but allow null
+#if ($field.schema().getType().getName() == "union")
+  /** ${field.doc()} (nullable) */
+  private final $javaType ${this.mangle($field.name())};
+#else
+  /** ${field.doc()} */
+  private final $javaType ${this.mangle($field.name())};
+#end
+#end
+
+  // ───────────────────────────────────────────────
+  // No-arg constructor (required by Avro deserialization)
+  // ───────────────────────────────────────────────
+  public ${schema.getName()}() {
+#foreach ($field in $schema.getFields())
+#set ($fieldSchema = $field.schema())
+#set ($isUnion = ($fieldSchema.getType().getName() == "union"))
+#if ($isUnion)
+#foreach ($unionType in $fieldSchema.getTypes())
+#if ($unionType.getType().getName() != "null")
+#set ($fieldSchema = $unionType)
+#end
+#end
+#end
+#if ($fieldSchema.getType().getName() == "array")
+    this.${this.mangle($field.name())} = Lists.immutable.empty();
+#elseif ($fieldSchema.getType().getName() == "map")
+    this.${this.mangle($field.name())} = #if($isUnion)null#{else}Maps.immutable.empty()#end;
+#elseif ($fieldSchema.getType().getName() == "string")
+    this.${this.mangle($field.name())} = #if($isUnion)null#{else}""#end;
+#elseif ($fieldSchema.getType().getName() == "double" || $fieldSchema.getType().getName() == "float")
+    this.${this.mangle($field.name())} = 0.0;
+#elseif ($fieldSchema.getType().getName() == "int")
+    this.${this.mangle($field.name())} = 0;
+#elseif ($fieldSchema.getType().getName() == "long")
+    this.${this.mangle($field.name())} = 0L;
+#elseif ($fieldSchema.getType().getName() == "boolean")
+    this.${this.mangle($field.name())} = false;
+#else
+    this.${this.mangle($field.name())} = null;
+#end
+#end
+  }
+
+  // ───────────────────────────────────────────────
+  // All-args constructor (defensive copies)
+  // ───────────────────────────────────────────────
+  private ${schema.getName()}(Builder builder) {
+#foreach ($field in $schema.getFields())
+#set ($fieldSchema = $field.schema())
+#set ($isUnion = ($fieldSchema.getType().getName() == "union"))
+#if ($isUnion)
+#foreach ($unionType in $fieldSchema.getTypes())
+#if ($unionType.getType().getName() != "null")
+#set ($fieldSchema = $unionType)
+#end
+#end
+#end
+#if ($fieldSchema.getType().getName() == "array")
+    this.${this.mangle($field.name())} = builder.${this.mangle($field.name())} != null
+        ? Lists.immutable.withAll(builder.${this.mangle($field.name())})
+        : Lists.immutable.empty();
+#elseif ($fieldSchema.getType().getName() == "map")
+#if ($isUnion)
+    this.${this.mangle($field.name())} = builder.${this.mangle($field.name())} != null
+        ? Maps.immutable.withAll(builder.${this.mangle($field.name())})
+        : null;
+#else
+    this.${this.mangle($field.name())} = builder.${this.mangle($field.name())} != null
+        ? Maps.immutable.withAll(builder.${this.mangle($field.name())})
+        : Maps.immutable.empty();
+#end
+#else
+    this.${this.mangle($field.name())} = builder.${this.mangle($field.name())};
+#end
+#end
+  }
+
+  // ───────────────────────────────────────────────
+  // Getters (no setters — class is immutable)
+  // ───────────────────────────────────────────────
+#foreach ($field in $schema.getFields())
+#set ($fieldSchema = $field.schema())
+#set ($isUnion = ($fieldSchema.getType().getName() == "union"))
+#if ($isUnion)
+#foreach ($unionType in $fieldSchema.getTypes())
+#if ($unionType.getType().getName() != "null")
+#set ($fieldSchema = $unionType)
+#end
+#end
+#end
+#if ($fieldSchema.getType().getName() == "array")
+#set ($itemType = $this.javaType($fieldSchema.getElementType()))
+  /**
+   * @return immutable list of ${field.name()} — never null
+   */
+  public ImmutableList<${itemType}> get${this.mangle($field.name(), true)}() {
+    return this.${this.mangle($field.name())};
+  }
+#elseif ($fieldSchema.getType().getName() == "map")
+#set ($valueType = $this.javaType($fieldSchema.getValueType()))
+  /**
+   * @return immutable map of ${field.name()}#if($isUnion) — may be null#else — never null#end
+
+   */
+  public ImmutableMap<String, ${valueType}> get${this.mangle($field.name(), true)}() {
+    return this.${this.mangle($field.name())};
+  }
+#else
+#set ($javaType = $this.javaType($fieldSchema))
+  public $javaType get${this.mangle($field.name(), true)}() {
+    return this.${this.mangle($field.name())};
+  }
+#end
+
+#end
+
+  // ───────────────────────────────────────────────
+  // Avro SpecificRecord implementation
+  // ───────────────────────────────────────────────
+  @Override
+  public Schema getSchema() {
+    return SCHEMA$;
+  }
+
+  /**
+   * Avro calls this during serialization.
+   * Collections are converted back to JDK types for wire compatibility.
+   */
+  @Override
+  public Object get(int field$) {
+    switch (field$) {
+#set ($i = 0)
+#foreach ($field in $schema.getFields())
+#set ($fieldSchema = $field.schema())
+#set ($isUnion = ($fieldSchema.getType().getName() == "union"))
+#if ($isUnion)
+#foreach ($unionType in $fieldSchema.getTypes())
+#if ($unionType.getType().getName() != "null")
+#set ($fieldSchema = $unionType)
+#end
+#end
+#end
+#if ($fieldSchema.getType().getName() == "array")
+      case ${i}: return this.${this.mangle($field.name())} != null
+          ? this.${this.mangle($field.name())}.castToList()
+          : java.util.Collections.emptyList();
+#elseif ($fieldSchema.getType().getName() == "map")
+      case ${i}: return this.${this.mangle($field.name())} != null
+          ? this.${this.mangle($field.name())}.castToMap()
+          : null;
+#else
+      case ${i}: return this.${this.mangle($field.name())};
+#end
+#set ($i = $i + 1)
+#end
+      default: throw new IndexOutOfBoundsException("Invalid index: " + field$);
+    }
+  }
+
+  /**
+   * Avro calls this during deserialization.
+   * JDK collections from the wire are wrapped into Eclipse Collections immutable types.
+   */
+  @Override
+  @SuppressWarnings("unchecked")
+  public void put(int field$, Object value$) {
+    switch (field$) {
+#set ($i = 0)
+#foreach ($field in $schema.getFields())
+#set ($fieldSchema = $field.schema())
+#set ($isUnion = ($fieldSchema.getType().getName() == "union"))
+#if ($isUnion)
+#foreach ($unionType in $fieldSchema.getTypes())
+#if ($unionType.getType().getName() != "null")
+#set ($fieldSchema = $unionType)
+#end
+#end
+#end
+#if ($fieldSchema.getType().getName() == "array")
+      case ${i}: {
+        // IMPORTANT: Use reflection to set final field during Avro deserialization
+        try {
+          java.lang.reflect.Field f = ${schema.getName()}.class.getDeclaredField("${this.mangle($field.name())}");
+          f.setAccessible(true);
+          f.set(this, value$ != null ? Lists.immutable.withAll((List<?>) value$) : Lists.immutable.empty());
+        } catch (ReflectiveOperationException e) {
+          throw new RuntimeException("Failed to set field ${field.name()}", e);
+        }
+        break;
+      }
+#elseif ($fieldSchema.getType().getName() == "map")
+      case ${i}: {
+        try {
+          java.lang.reflect.Field f = ${schema.getName()}.class.getDeclaredField("${this.mangle($field.name())}");
+          f.setAccessible(true);
+          f.set(this, value$ != null ? Maps.immutable.withAll((Map<?, ?>) value$) : #if($isUnion)null#{else}Maps.immutable.empty()#end);
+        } catch (ReflectiveOperationException e) {
+          throw new RuntimeException("Failed to set field ${field.name()}", e);
+        }
+        break;
+      }
+#else
+      case ${i}: {
+        try {
+          java.lang.reflect.Field f = ${schema.getName()}.class.getDeclaredField("${this.mangle($field.name())}");
+          f.setAccessible(true);
+          f.set(this, value$);
+        } catch (ReflectiveOperationException e) {
+          throw new RuntimeException("Failed to set field ${field.name()}", e);
+        }
+        break;
+      }
+#end
+#set ($i = $i + 1)
+#end
+      default: throw new IndexOutOfBoundsException("Invalid index: " + field$);
+    }
+  }
+
+  // ───────────────────────────────────────────────
+  // Builder
+  // ───────────────────────────────────────────────
+  public static Builder newBuilder() {
+    return new Builder();
+  }
+
+  public static Builder newBuilder(${schema.getName()} other) {
+    if (other == null) {
+      return new Builder();
+    }
+    return new Builder(other);
+  }
+
+  public static final class Builder {
+#foreach ($field in $schema.getFields())
+#set ($fieldSchema = $field.schema())
+#set ($isUnion = ($fieldSchema.getType().getName() == "union"))
+#if ($isUnion)
+#foreach ($unionType in $fieldSchema.getTypes())
+#if ($unionType.getType().getName() != "null")
+#set ($fieldSchema = $unionType)
+#end
+#end
+#end
+#if ($fieldSchema.getType().getName() == "array")
+#set ($itemType = $this.javaType($fieldSchema.getElementType()))
+    private Iterable<${itemType}> ${this.mangle($field.name())};
+#elseif ($fieldSchema.getType().getName() == "map")
+#set ($valueType = $this.javaType($fieldSchema.getValueType()))
+    private Map<String, ${valueType}> ${this.mangle($field.name())};
+#else
+#set ($javaType = $this.javaType($fieldSchema))
+    private $javaType ${this.mangle($field.name())};
+#end
+#end
+
+    private Builder() {}
+
+    private Builder(${schema.getName()} other) {
+#foreach ($field in $schema.getFields())
+#set ($fieldSchema = $field.schema())
+#set ($isUnion = ($fieldSchema.getType().getName() == "union"))
+#if ($isUnion)
+#foreach ($unionType in $fieldSchema.getTypes())
+#if ($unionType.getType().getName() != "null")
+#set ($fieldSchema = $unionType)
+#end
+#end
+#end
+#if ($fieldSchema.getType().getName() == "array")
+      this.${this.mangle($field.name())} = other.${this.mangle($field.name())};
+#elseif ($fieldSchema.getType().getName() == "map")
+      this.${this.mangle($field.name())} = other.${this.mangle($field.name())} != null
+          ? other.${this.mangle($field.name())}.castToMap() : null;
+#else
+      this.${this.mangle($field.name())} = other.${this.mangle($field.name())};
+#end
+#end
+    }
+
+#foreach ($field in $schema.getFields())
+#set ($fieldSchema = $field.schema())
+#set ($isUnion = ($fieldSchema.getType().getName() == "union"))
+#if ($isUnion)
+#foreach ($unionType in $fieldSchema.getTypes())
+#if ($unionType.getType().getName() != "null")
+#set ($fieldSchema = $unionType)
+#end
+#end
+#end
+#if ($fieldSchema.getType().getName() == "array")
+#set ($itemType = $this.javaType($fieldSchema.getElementType()))
+    /** Accepts any Iterable — will be defensively copied to ImmutableList on build. */
+    public Builder set${this.mangle($field.name(), true)}(Iterable<${itemType}> value) {
+      this.${this.mangle($field.name())} = value;
+      return this;
+    }
+#elseif ($fieldSchema.getType().getName() == "map")
+#set ($valueType = $this.javaType($fieldSchema.getValueType()))
+    /** Accepts any Map — will be defensively copied to ImmutableMap on build. */
+    public Builder set${this.mangle($field.name(), true)}(Map<String, ${valueType}> value) {
+      this.${this.mangle($field.name())} = value;
+      return this;
+    }
+#else
+#set ($javaType = $this.javaType($fieldSchema))
+    public Builder set${this.mangle($field.name(), true)}($javaType value) {
+      this.${this.mangle($field.name())} = value;
+      return this;
+    }
+#end
+
+#end
+    public ${schema.getName()} build() {
+      return new ${schema.getName()}(this);
+    }
+  }
+
+  // ───────────────────────────────────────────────
+  // toString / equals / hashCode
+  // ───────────────────────────────────────────────
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder("${schema.getName()}{");
+#set ($first = true)
+#foreach ($field in $schema.getFields())
+#if (!$first)
+    sb.append(", ");
+#end
+#set ($first = false)
+    sb.append("${field.name()}=").append(${this.mangle($field.name())});
+#end
+    sb.append('}');
+    return sb.toString();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (!(o instanceof ${schema.getName()} that)) return false;
+    return java.util.Objects.equals(this.get(0), that.get(0))
+#set ($i = 1)
+#foreach ($field in $schema.getFields())
+#if ($i > 0 && $i < $schema.getFields().size())
+        && java.util.Objects.equals(this.get(${i}), that.get(${i}))
+#end
+#set ($i = $i + 1)
+#end
+    ;
+  }
+
+  @Override
+  public int hashCode() {
+    return java.util.Objects.hash(
+#set ($first = true)
+#foreach ($field in $schema.getFields())
+#if (!$first)
+      ,
+#end
+#set ($first = false)
+      ${this.mangle($field.name())}
+#end
+    );
+  }
+}

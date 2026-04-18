@@ -1,0 +1,64 @@
+{
+  "namespace": "com.example.model",
+  "type": "record",
+  "name": "Trade",
+  "doc": "A financial trade with counterparties and risk factors",
+  "fields": [
+    {
+      "name": "tradeId",
+      "type": "string",
+      "doc": "Unique trade identifier"
+    },
+    {
+      "name": "notional",
+      "type": "double",
+      "doc": "Notional amount"
+    },
+    {
+      "name": "currency",
+      "type": "string",
+      "doc": "ISO 4217 currency code"
+    },
+    {
+      "name": "counterparties",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "doc": "List of counterparty identifiers"
+    },
+    {
+      "name": "riskFactors",
+      "type": {
+        "type": "map",
+        "values": "double"
+      },
+      "doc": "Named risk factors and their values"
+    },
+    {
+      "name": "tags",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "doc": "Classification tags"
+    },
+    {
+      "name": "tradeDate",
+      "type": "string",
+      "doc": "ISO 8601 trade date"
+    },
+    {
+      "name": "metadata",
+      "type": [
+        "null",
+        {
+          "type": "map",
+          "values": "string"
+        }
+      ],
+      "default": null,
+      "doc": "Optional metadata key-value pairs"
+    }
+  ]
+}
