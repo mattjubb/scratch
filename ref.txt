@@ -1,0 +1,124 @@
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+public class SchemaReferenceExtractor {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private static final Set<String> AVRO_PRIMITIVES = Set.of(
+        "null", "boolean", "int", "long", "float", "double", "bytes", "string"
+    );
+
+    private static final Set<String> AVRO_COMPLEX_KEYS = Set.of(
+        "record", "enum", "fixed", "array", "map", "error"
+    );
+
+    /**
+     * Extracts all externally-referenced named types from an Avro schema JSON string.
+     * Returns full names (namespace-qualified where applicable) in dependency order.
+     */
+    public static Set<String> extractReferencedTypes(String schemaJson) throws IOException {
+        JsonNode root = MAPPER.readTree(schemaJson);
+        Set<String> references = new LinkedHashSet<>();
+        Set<String> defined = new LinkedHashSet<>();
+        String namespace = null;
+        collectRefs(root, namespace, references, defined);
+        // Only return types that aren't defined inline within this schema
+        references.removeAll(defined);
+        return references;
+    }
+
+    private static void collectRefs(JsonNode node, String currentNamespace, 
+                                     Set<String> references, Set<String> defined) {
+        if (node.isTextual()) {
+            classifyTypeName(node.asText(), currentNamespace, references);
+            return;
+        }
+
+        if (node.isArray()) {
+            // Union or other array of types
+            for (JsonNode element : node) {
+                collectRefs(element, currentNamespace, references, defined);
+            }
+            return;
+        }
+
+        if (!node.isObject()) {
+            return;
+        }
+
+        // Determine the effective namespace for this scope
+        String scopeNamespace = currentNamespace;
+        if (node.has("namespace")) {
+            scopeNamespace = node.get("namespace").asText();
+        }
+
+        // If this node defines a named type (record, enum, fixed), register it
+        if (node.has("type") && node.has("name")) {
+            String typeValue = node.get("type").asText();
+            if ("record".equals(typeValue) || "enum".equals(typeValue) 
+                    || "fixed".equals(typeValue) || "error".equals(typeValue)) {
+                String name = node.get("name").asText();
+                defined.add(qualify(name, scopeNamespace));
+            }
+        }
+
+        // Walk "type" field
+        if (node.has("type")) {
+            JsonNode typeNode = node.get("type");
+            if (typeNode.isTextual()) {
+                String typeValue = typeNode.asText();
+                if (!AVRO_COMPLEX_KEYS.contains(typeValue)) {
+                    classifyTypeName(typeValue, scopeNamespace, references);
+                }
+            } else {
+                // Inline complex type (union as array, or nested definition as object)
+                collectRefs(typeNode, scopeNamespace, references, defined);
+            }
+        }
+
+        // Walk "items" (array element type)
+        if (node.has("items")) {
+            collectRefs(node.get("items"), scopeNamespace, references, defined);
+        }
+
+        // Walk "values" (map value type)
+        if (node.has("values")) {
+            collectRefs(node.get("values"), scopeNamespace, references, defined);
+        }
+
+        // Walk "fields" (record fields)
+        if (node.has("fields")) {
+            for (JsonNode field : node.get("fields")) {
+                collectRefs(field, scopeNamespace, references, defined);
+            }
+        }
+    }
+
+    private static void classifyTypeName(String typeName, String currentNamespace, 
+                                          Set<String> references) {
+        if (AVRO_PRIMITIVES.contains(typeName) || AVRO_COMPLEX_KEYS.contains(typeName)) {
+            return;
+        }
+        // It's a reference to a named type
+        references.add(qualify(typeName, currentNamespace));
+    }
+
+    /**
+     * If the name already contains a dot, it's fully qualified.
+     * Otherwise, prepend the current namespace.
+     */
+    private static String qualify(String name, String namespace) {
+        if (name.contains(".")) {
+            return name;
+        }
+        if (namespace != null && !namespace.isEmpty()) {
+            return namespace + "." + name;
+        }
+        return name;
+    }
+}
