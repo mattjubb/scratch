@@ -826,251 +826,65 @@ main {
 
 <script>
 // ╔══════════════════════════════════════════════════════════════╗
-// ║  SAMPLE DATA — Replace with real registry data / API call   ║
+// ║  API & Data Layer                                            ║
 // ╚══════════════════════════════════════════════════════════════╝
 
-const REGISTRY = [
-  {
-    id: 1001,
-    group: "trading",
-    project: "orders",
-    name: "OrderEvent",
-    schemaType: "avro",
-    versions: [
-      { version: 1, doc: "Represents a trading order lifecycle event across all asset classes.", schema: {
-        type: "record", name: "OrderEvent", namespace: "com.vasara.schemas.trading.orders",
-        fields: [
-          { name: "orderId", type: "string", doc: "Globally unique order identifier (UUID v4)." },
-          { name: "timestamp", type: { type: "long", logicalType: "timestamp-millis" }, doc: "Event timestamp in epoch milliseconds." },
-          { name: "side", type: { type: "enum", name: "Side", symbols: ["BUY","SELL","SHORT_SELL"] }, doc: "Order side." },
-          { name: "orderType", type: { type: "enum", name: "OrderType", symbols: ["MARKET","LIMIT","STOP","STOP_LIMIT","IOC","FOK"] }, doc: "Execution order type." },
-          { name: "instrument", type: "InstrumentRef", refId: 1003, doc: "Reference to the traded instrument." },
-          { name: "quantity", type: "double", doc: "Order quantity in units." },
-          { name: "limitPrice", type: ["null","double"], doc: "Limit price if applicable.", default: null },
-          { name: "status", type: { type: "enum", name: "OrderStatus", symbols: ["NEW","PARTIALLY_FILLED","FILLED","CANCELLED","REJECTED","EXPIRED"] }, doc: "Current order status." },
-          { name: "trader", type: "TraderProfile", refId: 1006, doc: "Trader who placed the order." },
-          { name: "fills", type: { type: "array", items: "FillEvent" }, refId: 1002, doc: "Execution fills for this order." },
-          { name: "metadata", type: { type: "map", values: "string" }, doc: "Arbitrary key-value metadata." }
-        ]
-      }},
-      { version: 2, doc: "V2 adds algo routing fields and TIF support.", schema: {
-        type: "record", name: "OrderEvent", namespace: "com.vasara.schemas.trading.orders",
-        fields: [
-          { name: "orderId", type: "string", doc: "Globally unique order identifier." },
-          { name: "timestamp", type: { type: "long", logicalType: "timestamp-millis" }, doc: "Event timestamp." },
-          { name: "side", type: { type: "enum", name: "Side", symbols: ["BUY","SELL","SHORT_SELL"] }, doc: "Order side." },
-          { name: "orderType", type: { type: "enum", name: "OrderType", symbols: ["MARKET","LIMIT","STOP","STOP_LIMIT","IOC","FOK","TWAP","VWAP"] }, doc: "Execution order type including algo types." },
-          { name: "instrument", type: "InstrumentRef", refId: 1003, doc: "Traded instrument." },
-          { name: "quantity", type: "double", doc: "Quantity." },
-          { name: "limitPrice", type: ["null","double"], doc: "Limit price.", default: null },
-          { name: "timeInForce", type: { type: "enum", name: "TimeInForce", symbols: ["DAY","GTC","GTD","IOC","FOK"] }, doc: "Time in force policy." },
-          { name: "status", type: { type: "enum", name: "OrderStatus", symbols: ["NEW","PARTIALLY_FILLED","FILLED","CANCELLED","REJECTED","EXPIRED"] }, doc: "Order status." },
-          { name: "trader", type: "TraderProfile", refId: 1006, doc: "Trader." },
-          { name: "fills", type: { type: "array", items: "FillEvent" }, refId: 1002, doc: "Fills." },
-          { name: "algoParams", type: ["null",{ type: "map", values: "string" }], doc: "Algorithm parameters.", default: null },
-          { name: "metadata", type: { type: "map", values: "string" }, doc: "Metadata." }
-        ]
-      }}
-    ]
-  },
-  {
-    id: 1002,
-    group: "trading",
-    project: "orders",
-    name: "FillEvent",
-    schemaType: "avro",
-    versions: [{ version: 1, doc: "An individual execution fill against an order.", schema: {
-      type: "record", name: "FillEvent", namespace: "com.vasara.schemas.trading.orders",
-      fields: [
-        { name: "fillId", type: "string", doc: "Unique fill identifier." },
-        { name: "orderId", type: "string", doc: "Parent order ID." },
-        { name: "executionPrice", type: "double", doc: "Price at which the fill executed." },
-        { name: "executionQty", type: "double", doc: "Fill quantity." },
-        { name: "venue", type: "string", doc: "Execution venue code." },
-        { name: "timestamp", type: { type: "long", logicalType: "timestamp-millis" }, doc: "Fill timestamp." },
-        { name: "commission", type: "double", doc: "Commission charged." },
-        { name: "settlementDate", type: { type: "int", logicalType: "date" }, doc: "Expected settlement date." }
-      ]
-    }}]
-  },
-  {
-    id: 1003,
-    group: "trading",
-    project: "refdata",
-    name: "InstrumentRef",
-    schemaType: "avro",
-    versions: [{ version: 1, doc: "Reference data for a tradable financial instrument.", schema: {
-      type: "record", name: "InstrumentRef", namespace: "com.vasara.schemas.trading.refdata",
-      fields: [
-        { name: "symbol", type: "string", doc: "Ticker symbol." },
-        { name: "isin", type: ["null","string"], doc: "ISIN code.", default: null },
-        { name: "cusip", type: ["null","string"], doc: "CUSIP code.", default: null },
-        { name: "name", type: "string", doc: "Full instrument name." },
-        { name: "assetClass", type: { type: "enum", name: "AssetClass", symbols: ["EQUITY","FIXED_INCOME","FX","COMMODITY","DERIVATIVE","CRYPTO"] }, doc: "Asset classification." },
-        { name: "exchange", type: "string", doc: "Primary exchange code." },
-        { name: "currency", type: "string", doc: "Denomination currency (ISO 4217)." },
-        { name: "lotSize", type: "int", doc: "Standard lot size.", default: 1 }
-      ]
-    }}]
-  },
-  {
-    id: 1004,
-    group: "trading",
-    project: "refdata",
-    name: "PricingSnapshot",
-    schemaType: "avro",
-    versions: [{ version: 1, doc: "Point-in-time pricing data for a given instrument.", schema: {
-      type: "record", name: "PricingSnapshot", namespace: "com.vasara.schemas.trading.refdata",
-      fields: [
-        { name: "instrument", type: "InstrumentRef", refId: 1003, doc: "The instrument being priced." },
-        { name: "bidPrice", type: "double", doc: "Best bid price." },
-        { name: "askPrice", type: "double", doc: "Best ask price." },
-        { name: "midPrice", type: "double", doc: "Mid price." },
-        { name: "lastTradePrice", type: ["null","double"], doc: "Most recent trade price.", default: null },
-        { name: "volume", type: "long", doc: "Cumulative volume." },
-        { name: "timestamp", type: { type: "long", logicalType: "timestamp-millis" }, doc: "Snapshot timestamp." },
-        { name: "source", type: "string", doc: "Data source identifier." }
-      ]
-    }}]
-  },
-  {
-    id: 1005,
-    group: "risk",
-    project: "analytics",
-    name: "PositionRisk",
-    schemaType: "avro",
-    versions: [{ version: 1, doc: "Risk metrics computed at the individual position level, aggregated into portfolio-level views.", schema: {
-      type: "record", name: "PositionRisk", namespace: "com.vasara.schemas.risk.analytics",
-      fields: [
-        { name: "positionId", type: "string", doc: "Unique position identifier." },
-        { name: "portfolioId", type: "string", doc: "Owning portfolio." },
-        { name: "instrument", type: "InstrumentRef", refId: 1003, doc: "Instrument held." },
-        { name: "quantity", type: "double", doc: "Position size." },
-        { name: "marketValue", type: "double", doc: "Current market value." },
-        { name: "unrealizedPnl", type: "double", doc: "Unrealized P&L." },
-        { name: "var95", type: "double", doc: "95th percentile Value-at-Risk." },
-        { name: "var99", type: "double", doc: "99th percentile Value-at-Risk." },
-        { name: "beta", type: "double", doc: "Beta relative to benchmark." },
-        { name: "delta", type: ["null","double"], doc: "Option delta (derivatives only).", default: null },
-        { name: "gamma", type: ["null","double"], doc: "Option gamma.", default: null },
-        { name: "pricing", type: "PricingSnapshot", refId: 1004, doc: "Latest pricing for this position." },
-        { name: "asOfDate", type: { type: "int", logicalType: "date" }, doc: "Calculation date." }
-      ]
-    }}]
-  },
-  {
-    id: 1006,
-    group: "trading",
-    project: "identity",
-    name: "TraderProfile",
-    schemaType: "avro",
-    versions: [{ version: 1, doc: "Trader identity and entitlement profile.", schema: {
-      type: "record", name: "TraderProfile", namespace: "com.vasara.schemas.trading.identity",
-      fields: [
-        { name: "traderId", type: "string", doc: "Unique trader ID." },
-        { name: "displayName", type: "string", doc: "Human readable display name." },
-        { name: "desk", type: "string", doc: "Trading desk assignment." },
-        { name: "region", type: { type: "enum", name: "Region", symbols: ["AMER","EMEA","APAC"] }, doc: "Regulatory region." },
-        { name: "entitlements", type: { type: "array", items: "string" }, doc: "List of entitlement keys." },
-        { name: "isActive", type: "boolean", doc: "Whether the trader is currently active.", default: true }
-      ]
-    }}]
-  },
-  {
-    id: 1007,
-    group: "risk",
-    project: "analytics",
-    name: "StressTestResult",
-    schemaType: "avro",
-    versions: [{ version: 1, doc: "Results of a stress test scenario against a portfolio.", schema: {
-      type: "record", name: "StressTestResult", namespace: "com.vasara.schemas.risk.analytics",
-      fields: [
-        { name: "scenarioId", type: "string", doc: "Stress scenario identifier." },
-        { name: "scenarioName", type: "string", doc: "Human-readable scenario name." },
-        { name: "portfolioId", type: "string", doc: "Target portfolio." },
-        { name: "pnlImpact", type: "double", doc: "Estimated P&L impact." },
-        { name: "varShift", type: "double", doc: "VaR change under scenario." },
-        { name: "affectedPositions", type: { type: "array", items: "PositionRisk" }, refId: 1005, doc: "Positions affected by the scenario." },
-        { name: "computedAt", type: { type: "long", logicalType: "timestamp-millis" }, doc: "Computation timestamp." },
-        { name: "approved", type: "boolean", doc: "Whether reviewed and approved.", default: false }
-      ]
-    }}]
-  },
-  {
-    id: 1008,
-    group: "compliance",
-    project: "audit",
-    name: "AuditEntry",
-    schemaType: "avro",
-    versions: [{ version: 1, doc: "Immutable audit log entry for regulatory compliance and SOX reporting.", schema: {
-      type: "record", name: "AuditEntry", namespace: "com.vasara.schemas.compliance.audit",
-      fields: [
-        { name: "entryId", type: "string", doc: "Unique log entry ID." },
-        { name: "actor", type: "TraderProfile", refId: 1006, doc: "The user performing the action." },
-        { name: "action", type: { type: "enum", name: "AuditAction", symbols: ["CREATE","READ","UPDATE","DELETE","APPROVE","REJECT","EXPORT"] }, doc: "The action performed." },
-        { name: "resourceType", type: "string", doc: "Type of resource affected." },
-        { name: "resourceId", type: "string", doc: "ID of the affected resource." },
-        { name: "timestamp", type: { type: "long", logicalType: "timestamp-millis" }, doc: "When the action occurred." },
-        { name: "ipAddress", type: "string", doc: "Source IP address." },
-        { name: "details", type: { type: "map", values: "string" }, doc: "Additional context about the action." },
-        { name: "complianceFlags", type: { type: "array", items: "string" }, doc: "Applicable compliance tags (SOX, MiFID, etc.)." }
-      ]
-    }}]
-  },
-  {
-    id: 1009,
-    group: "compliance",
-    project: "audit",
-    name: "ComplianceAlert",
-    schemaType: "avro",
-    versions: [{ version: 1, doc: "Alert raised when compliance rules are breached.", schema: {
-      type: "record", name: "ComplianceAlert", namespace: "com.vasara.schemas.compliance.audit",
-      fields: [
-        { name: "alertId", type: "string", doc: "Alert identifier." },
-        { name: "severity", type: { type: "enum", name: "Severity", symbols: ["LOW","MEDIUM","HIGH","CRITICAL"] }, doc: "Alert severity." },
-        { name: "ruleId", type: "string", doc: "The compliance rule that triggered." },
-        { name: "triggeringEntry", type: "AuditEntry", refId: 1008, doc: "The audit entry that caused this alert." },
-        { name: "message", type: "string", doc: "Human-readable alert description." },
-        { name: "acknowledged", type: "boolean", doc: "Whether a compliance officer has reviewed.", default: false },
-        { name: "raisedAt", type: { type: "long", logicalType: "timestamp-millis" }, doc: "When the alert was raised." }
-      ]
-    }}]
-  },
-  {
-    id: 1010,
-    group: "risk",
-    project: "governance",
-    name: "ModelValidation",
-    schemaType: "avro",
-    versions: [{ version: 1, doc: "SR 11-7 model validation record for CCAR model governance.", schema: {
-      type: "record", name: "ModelValidation", namespace: "com.vasara.schemas.risk.governance",
-      fields: [
-        { name: "modelId", type: "string", doc: "Unique model identifier." },
-        { name: "modelName", type: "string", doc: "Human-readable model name." },
-        { name: "tier", type: { type: "enum", name: "ModelTier", symbols: ["TIER_1","TIER_2","TIER_3"] }, doc: "Model materiality tier per SR 11-7." },
-        { name: "validationStatus", type: { type: "enum", name: "ValidationStatus", symbols: ["PENDING","IN_REVIEW","APPROVED","CONDITIONALLY_APPROVED","REJECTED"] }, doc: "Current validation status." },
-        { name: "validator", type: "TraderProfile", refId: 1006, doc: "Assigned model validator." },
-        { name: "lastValidationDate", type: { type: "int", logicalType: "date" }, doc: "Date of most recent validation." },
-        { name: "findings", type: { type: "array", items: "string" }, doc: "Validation findings and observations." },
-        { name: "backtestResults", type: { type: "map", values: "double" }, doc: "Key backtest metrics." }
-      ]
-    }}]
-  }
-];
-
-// ╔══════════════════════════════════════════════════════════════╗
-// ║  Build Indexes                                              ║
-// ╚══════════════════════════════════════════════════════════════╝
+// Catalog: Map<group, Map<project, Map<schemaName, SchemaSummary>>>
+// SchemaSummary: { id, name, group, project, namespace, schemaType }
+let catalog = {};
+// Flat index by ID for quick lookups
 const schemaById = {};
-REGISTRY.forEach(s => schemaById[s.id] = s);
+// Cache of fetched full schema definitions (keyed by id)
+const schemaCache = {};
+
+async function fetchCatalog() {
+  try {
+    const res = await fetch('/catalog');
+    if (!res.ok) throw new Error('Catalog fetch failed: ' + res.status);
+    catalog = await res.json();
+    // Build flat index
+    for (const [group, projects] of Object.entries(catalog)) {
+      for (const [project, schemas] of Object.entries(projects)) {
+        for (const [name, summary] of Object.entries(schemas)) {
+          // Ensure group/project/name are populated even if the API omits them
+          summary.group = summary.group || group;
+          summary.project = summary.project || project;
+          summary.name = summary.name || name;
+          schemaById[summary.id] = summary;
+        }
+      }
+    }
+    renderTree();
+  } catch (err) {
+    console.error('Failed to load catalog:', err);
+    document.getElementById('tree').innerHTML =
+      '<div class="detail-empty" style="height:100px;font-size:12px;padding:20px"><p>Failed to load catalog</p><p style="color:var(--text-tertiary);font-size:11px;margin-top:4px">' + err.message + '</p></div>';
+  }
+}
+
+async function fetchSchema(id) {
+  if (schemaCache[id]) return schemaCache[id];
+  try {
+    const res = await fetch('/schema/' + id);
+    if (!res.ok) throw new Error('Schema fetch failed: ' + res.status);
+    const schema = await res.json();
+    schemaCache[id] = schema;
+    return schema;
+  } catch (err) {
+    console.error('Failed to load schema ' + id + ':', err);
+    return null;
+  }
+}
 
 function getGroups() {
+  // Transform catalog map into the tree structure: { group: { project: [summary, ...] } }
   const groups = {};
-  REGISTRY.forEach(s => {
-    if (!groups[s.group]) groups[s.group] = {};
-    if (!groups[s.group][s.project]) groups[s.group][s.project] = [];
-    groups[s.group][s.project].push(s);
-  });
+  for (const [group, projects] of Object.entries(catalog)) {
+    groups[group] = {};
+    for (const [project, schemas] of Object.entries(projects)) {
+      groups[group][project] = Object.values(schemas);
+    }
+  }
   return groups;
 }
 
@@ -1156,23 +970,36 @@ function filterTree(val) { renderTree(val); }
 // ╔══════════════════════════════════════════════════════════════╗
 // ║  Schema Detail View                                         ║
 // ╚══════════════════════════════════════════════════════════════╝
-let currentVersion = null;
-
-function selectSchema(id) {
+async function selectSchema(id) {
   activeSchemaId = id;
   const s = schemaById[id];
   if (!s) return;
-  currentVersion = s.versions.length;
   renderTree(document.querySelector('.sidebar-search input').value);
-  renderDetail(s, s.versions[s.versions.length - 1]);
+
+  // Fetch the full schema definition
+  const schema = await fetchSchema(id);
+  if (!schema) return;
+
+  // Build a version-like wrapper so renderDetail works
+  // The API returns raw Avro JSON; wrap it as a single-version entry
+  const entry = {
+    id: s.id,
+    group: s.group,
+    project: s.project,
+    name: s.name,
+    schemaType: s.schemaType || 'avro',
+    versions: [{ version: 1, doc: schema.doc || '', schema: schema }]
+  };
+
+  renderDetail(entry, entry.versions[0]);
+
   if (document.querySelector('.graph-view.active')) {
-    // When selecting from sidebar, re-root the graph and auto-expand root
     graphRootId = id;
     graphState.expandedNodes.clear();
     graphState.expandedNodes.add(id);
     graphState.panX = 0;
     graphState.panY = 0;
-    renderGraph();
+    await renderGraphAsync();
   }
 }
 
@@ -1183,18 +1010,15 @@ function renderDetail(s, ver) {
   detail.classList.add('fade-in');
   setTimeout(() => detail.classList.remove('fade-in'), 300);
 
-  const versionOptions = s.versions.map(v =>
-    `<option value="${v.version}" ${v.version === ver.version ? 'selected' : ''}>v${v.version}</option>`
-  ).join('');
+  const namespace = ver.schema.namespace || ('com.vasara.schemas.' + s.group + '.' + s.project);
 
   let html = `<div class="schema-header">
     <div class="schema-breadcrumb">${s.group} <span>/</span> ${s.project}</div>
     <h1 class="schema-title">${s.name}</h1>
     <div class="schema-meta">
-      <span class="meta-badge type-${s.schemaType}">${s.schemaType.toUpperCase()}</span>
+      <span class="meta-badge type-${s.schemaType}">${(s.schemaType || 'avro').toUpperCase()}</span>
       <span class="meta-badge">ID #${s.id}</span>
-      <span class="meta-badge">${'com.vasara.schemas.' + s.group + '.' + s.project}</span>
-      <select class="version-selector" onchange="changeVersion(${s.id}, this.value)">${versionOptions}</select>
+      <span class="meta-badge">${namespace}</span>
     </div>
     ${ver.doc ? `<p class="schema-doc">${ver.doc}</p>` : ''}
   </div>`;
@@ -1254,7 +1078,7 @@ function renderDetail(s, ver) {
 
 function renderFieldRow(f, depth) {
   const indent = depth > 0 ? ` field-indent${depth > 1 ? '-2' : ''}` : '';
-  const typeInfo = resolveType(f.type, f.refId);
+  const typeInfo = resolveType(f.type);
   const isRequired = !isNullable(f.type);
   const defaultVal = f.default !== undefined ? JSON.stringify(f.default) : '—';
 
@@ -1271,22 +1095,32 @@ function renderFieldRow(f, depth) {
   return row;
 }
 
-function resolveType(type, refId) {
+/** Look up a schema ID by type name from the catalog */
+function findSchemaIdByName(name) {
+  for (const id in schemaById) {
+    if (schemaById[id].name === name) return parseInt(id);
+  }
+  return null;
+}
+
+function resolveType(type) {
   if (typeof type === 'string') {
-    // Check if it's a reference to another schema
+    const prims = ['null','boolean','int','long','float','double','bytes','string'];
+    if (prims.includes(type)) {
+      return { html: `<span class="field-type primitive">${type}</span>`, category: 'primitive' };
+    }
+    // Check if this is a known schema name
+    const refId = findSchemaIdByName(type);
     if (refId) {
-      const ref = schemaById[refId];
       return { html: `<span class="field-type ref" onclick="selectSchema(${refId})" title="Jump to ${type}">${type} ↗</span>`, category: 'ref' };
     }
-    const cat = primitiveCategory(type);
-    return { html: `<span class="field-type ${cat}">${type}</span>`, category: cat };
+    return { html: `<span class="field-type record">${type}</span>`, category: 'record' };
   }
 
   if (Array.isArray(type)) {
-    // Union
     const parts = type.map(t => {
       if (t === 'null') return '<span class="field-type primitive">null</span>';
-      return resolveType(t, refId).html;
+      return resolveType(t).html;
     });
     return { html: parts.join(' <span style="color:var(--text-tertiary);font-size:11px">|</span> '), category: 'union' };
   }
@@ -1298,8 +1132,9 @@ function resolveType(type, refId) {
     }
     if (type.type === 'array') {
       const itemType = typeof type.items === 'string' ? type.items : (type.items?.name || 'object');
-      if (refId) {
-        return { html: `<span class="field-type array">array‹<span class="field-type ref" onclick="selectSchema(${refId})" style="padding:0">${itemType} ↗</span>›</span>`, category: 'array' };
+      const itemRefId = typeof type.items === 'string' ? findSchemaIdByName(type.items) : null;
+      if (itemRefId) {
+        return { html: `<span class="field-type array">array‹<span class="field-type ref" onclick="selectSchema(${itemRefId})" style="padding:0">${itemType} ↗</span>›</span>`, category: 'array' };
       }
       return { html: `<span class="field-type array">array‹${itemType}›</span>`, category: 'array' };
     }
@@ -1316,20 +1151,9 @@ function resolveType(type, refId) {
   return { html: `<span class="field-type primitive">unknown</span>`, category: 'primitive' };
 }
 
-function primitiveCategory(type) {
-  const prims = ['null','boolean','int','long','float','double','bytes','string'];
-  return prims.includes(type) ? 'primitive' : 'record';
-}
-
 function isNullable(type) {
   if (Array.isArray(type)) return type.includes('null');
   return false;
-}
-
-function changeVersion(id, version) {
-  const s = schemaById[id];
-  const ver = s.versions.find(v => v.version == version);
-  if (ver) renderDetail(s, ver);
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
@@ -1345,18 +1169,44 @@ function setView(view) {
   if (view === 'graph') {
     dv.classList.add('hidden');
     gv.classList.add('active');
-    // Set graph root and auto-expand if a schema is selected
     if (activeSchemaId) {
       graphRootId = activeSchemaId;
       if (!graphState.expandedNodes.has(activeSchemaId)) {
         graphState.expandedNodes.add(activeSchemaId);
       }
     }
-    renderGraph();
+    renderGraphAsync();
   } else {
     dv.classList.remove('hidden');
     gv.classList.remove('active');
   }
+}
+
+/** Build a name→id lookup from catalog for resolving Avro type references */
+function buildNameIndex() {
+  const idx = {};
+  for (const id in schemaById) {
+    const s = schemaById[id];
+    idx[s.name] = parseInt(id);
+  }
+  return idx;
+}
+
+/** Extract reference target name from an Avro field type */
+function extractRefName(type) {
+  if (typeof type === 'string') return type;
+  if (Array.isArray(type)) {
+    for (const t of type) {
+      const n = extractRefName(t);
+      if (n) return n;
+    }
+    return null;
+  }
+  if (type && typeof type === 'object') {
+    if (type.type === 'array' && type.items) return extractRefName(type.items);
+    if (type.type === 'map' && type.values) return extractRefName(type.values);
+  }
+  return null;
 }
 
 function buildGraphData() {
@@ -1364,42 +1214,96 @@ function buildGraphData() {
   const edges = [];
   const nodeMap = {};
   const expandedSet = graphState.expandedNodes;
+  const nameIndex = buildNameIndex();
+  const prims = new Set(['null','boolean','int','long','float','double','bytes','string']);
 
-  // Use graphRootId as the root; fall back to activeSchemaId or all schemas
   const rootId = graphRootId || activeSchemaId;
-  const rootIds = rootId ? [rootId] : REGISTRY.map(s => s.id);
+  const rootIds = rootId ? [rootId] : Object.keys(schemaById).map(Number);
   const visited = new Set();
 
-  function addSchemaNode(id, depth = 0) {
+  function addSchemaNode(id, depth) {
     if (visited.has(id)) return;
     visited.add(id);
     const s = schemaById[id];
     if (!s) return;
-    const ver = s.versions[s.versions.length - 1];
+    const schema = schemaCache[id];
+    if (!schema) return;
+
+    const fields = schema.fields || [];
     const refs = [];
 
-    if (ver.schema.fields) {
-      ver.schema.fields.forEach(f => {
-        if (f.refId && schemaById[f.refId]) {
-          refs.push({ fieldName: f.name, targetId: f.refId });
-        }
-      });
-    }
+    fields.forEach(f => {
+      const refName = extractRefName(f.type);
+      if (refName && !prims.has(refName) && nameIndex[refName] && nameIndex[refName] !== id) {
+        refs.push({ fieldName: f.name, targetId: nameIndex[refName] });
+      }
+    });
 
-    nodes.push({ id: s.id, name: s.name, group: s.group, project: s.project, type: ver.schema.type, fieldCount: ver.schema.fields?.length || 0, fields: ver.schema.fields || [], refs, depth });
+    nodes.push({
+      id: s.id, name: s.name, group: s.group, project: s.project,
+      type: schema.type || 'record', fieldCount: fields.length,
+      fields: fields, refs: refs, depth: depth
+    });
     nodeMap[s.id] = nodes.length - 1;
 
     refs.forEach(r => {
       edges.push({ from: s.id, to: r.targetId, label: r.fieldName });
-      // Always expand depth 0 (root), otherwise respect expandedSet, or expand all if no root
       if (depth === 0 || expandedSet.has(s.id) || !rootId) {
         addSchemaNode(r.targetId, depth + 1);
       }
     });
   }
 
-  rootIds.forEach(id => addSchemaNode(id));
+  rootIds.forEach(id => addSchemaNode(id, 0));
   return { nodes, edges, nodeMap };
+}
+
+/** Async version: pre-fetches schemas needed for the graph before rendering */
+async function prefetchGraphSchemas() {
+  const nameIndex = buildNameIndex();
+  const prims = new Set(['null','boolean','int','long','float','double','bytes','string']);
+  const rootId = graphRootId || activeSchemaId;
+  const rootIds = rootId ? [rootId] : Object.keys(schemaById).map(Number);
+  const toFetch = new Set();
+  const visited = new Set();
+
+  // Walk the graph to discover which schemas we need
+  function discover(id, depth) {
+    if (visited.has(id)) return;
+    visited.add(id);
+    toFetch.add(id);
+    const schema = schemaCache[id];
+    if (!schema) return;
+    const expandedSet = graphState.expandedNodes;
+    (schema.fields || []).forEach(f => {
+      const refName = extractRefName(f.type);
+      if (refName && !prims.has(refName) && nameIndex[refName] && nameIndex[refName] !== id) {
+        if (depth === 0 || expandedSet.has(id) || !rootId) {
+          discover(nameIndex[refName], depth + 1);
+        }
+      }
+    });
+  }
+
+  rootIds.forEach(id => discover(id, 0));
+
+  // Fetch any missing schemas
+  const missing = [...toFetch].filter(id => !schemaCache[id]);
+  if (missing.length > 0) {
+    await Promise.all(missing.map(id => fetchSchema(id)));
+    // Re-discover now that we have more schemas cached (may reveal deeper refs)
+    visited.clear();
+    rootIds.forEach(id => discover(id, 0));
+    const moreMissing = [...toFetch].filter(id => !schemaCache[id]);
+    if (moreMissing.length > 0) {
+      await Promise.all(moreMissing.map(id => fetchSchema(id)));
+    }
+  }
+}
+
+async function renderGraphAsync() {
+  await prefetchGraphSchemas();
+  renderGraph();
 }
 
 function renderGraph() {
@@ -1518,12 +1422,18 @@ function renderGraph() {
   });
 
   // Type color helper
+  const prims = new Set(['null','boolean','int','long','float','double','bytes','string']);
+
+  function isFieldRef(f) {
+    const refName = extractRefName(f.type);
+    return refName && !prims.has(refName) && !!findSchemaIdByName(refName);
+  }
+
   function fieldTypeColor(f) {
-    if (f.refId) return cs.getPropertyValue('--type-ref').trim();
+    if (isFieldRef(f)) return cs.getPropertyValue('--type-ref').trim();
     const t = f.type;
     if (typeof t === 'string') {
-      const prims = ['null','boolean','int','long','float','double','bytes','string'];
-      return prims.includes(t) ? cs.getPropertyValue('--type-primitive').trim() : cs.getPropertyValue('--type-record').trim();
+      return prims.has(t) ? cs.getPropertyValue('--type-primitive').trim() : cs.getPropertyValue('--type-record').trim();
     }
     if (Array.isArray(t)) return cs.getPropertyValue('--type-union').trim();
     if (t && typeof t === 'object') {
@@ -1536,7 +1446,7 @@ function renderGraph() {
   }
 
   function fieldTypeLabel(f) {
-    if (f.refId) {
+    if (isFieldRef(f)) {
       const t = typeof f.type === 'string' ? f.type : (f.type?.items || f.type?.name || 'ref');
       return typeof t === 'string' ? t : 'ref';
     }
@@ -1624,7 +1534,7 @@ function renderGraph() {
     const typeFontSize = Math.max(7, 9 * z);
     n.fields.forEach((f, i) => {
       const fy = y + headerH + (i + 0.65) * fieldRowH;
-      const isRef = !!f.refId;
+      const isRef = isFieldRef(f);
       const tColor = fieldTypeColor(f);
 
       // Type dot
@@ -1677,7 +1587,7 @@ canvas.addEventListener('mousemove', e => {
 canvas.addEventListener('mouseup', () => { graphState.dragging = false; });
 canvas.addEventListener('mouseleave', () => { graphState.dragging = false; });
 
-canvas.addEventListener('click', e => {
+canvas.addEventListener('click', async e => {
   if (graphState.dragging) return;
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
@@ -1686,19 +1596,21 @@ canvas.addEventListener('click', e => {
   for (const n of graphState.nodes) {
     if (!n.hitBox) continue;
     if (mx >= n.hitBox.x && mx <= n.hitBox.x + n.hitBox.w && my >= n.hitBox.y && my <= n.hitBox.y + n.hitBox.h) {
-      // Toggle expanded on this node (keeps graph root stable)
       if (graphState.expandedNodes.has(n.id)) {
         graphState.expandedNodes.delete(n.id);
       } else {
         graphState.expandedNodes.add(n.id);
       }
-      // Update active selection for highlighting, but don't re-root
       activeSchemaId = n.id;
       renderTree(document.querySelector('.sidebar-search input').value);
-      renderGraph();
-      // Update detail view to show the clicked schema
+      await renderGraphAsync();
+      // Update detail view
+      const schema = schemaCache[n.id];
       const s = schemaById[n.id];
-      if (s) renderDetail(s, s.versions[s.versions.length - 1]);
+      if (s && schema) {
+        const entry = { id: s.id, group: s.group, project: s.project, name: s.name, schemaType: s.schemaType || 'avro', versions: [{ version: 1, doc: schema.doc || '', schema: schema }] };
+        renderDetail(entry, entry.versions[0]);
+      }
       return;
     }
   }
@@ -1740,21 +1652,12 @@ function toggleTheme() {
 // ║  Raw View — JSON / YAML helpers                              ║
 // ╚══════════════════════════════════════════════════════════════╝
 
-/** Build a clean Avro-style schema object from the registry entry (strips internal refId etc.) */
+/** Build a clean copy of the schema for display */
 function buildCleanSchema(s, ver) {
   const schema = JSON.parse(JSON.stringify(ver.schema));
-  schema.namespace = 'com.vasara.schemas.' + s.group + '.' + s.project;
-  // Strip internal refId from fields recursively
-  function cleanFields(fields) {
-    if (!fields) return;
-    fields.forEach(f => {
-      delete f.refId;
-      if (f.type && typeof f.type === 'object' && !Array.isArray(f.type)) {
-        if (f.type.fields) cleanFields(f.type.fields);
-      }
-    });
+  if (!schema.namespace) {
+    schema.namespace = 'com.vasara.schemas.' + s.group + '.' + s.project;
   }
-  cleanFields(schema.fields);
   return schema;
 }
 
@@ -1930,7 +1833,7 @@ function copyRawTab(fmt, btn) {
 // ╔══════════════════════════════════════════════════════════════╗
 // ║  Init                                                        ║
 // ╚══════════════════════════════════════════════════════════════╝
-renderTree();
+fetchCatalog();
 
 window.addEventListener('resize', () => {
   if (document.querySelector('.graph-view.active')) renderGraph();
