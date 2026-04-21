@@ -1,0 +1,1940 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vasara Datapedia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=DM+Sans:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Dark theme (default) */
+  --bg-primary: #0c0c0e;
+  --bg-secondary: #131316;
+  --bg-tertiary: #1a1a1f;
+  --bg-hover: #22222a;
+  --bg-active: #2a2a35;
+  --bg-card: #16161b;
+  --border: #2a2a33;
+  --border-subtle: #1f1f27;
+  --text-primary: #e8e6e3;
+  --text-secondary: #9a9898;
+  --text-tertiary: #6a6868;
+  --accent: #c9a84c;
+  --accent-dim: #c9a84c22;
+  --accent-hover: #dbb85c;
+  --type-primitive: #7eb8da;
+  --type-record: #d4a0e0;
+  --type-enum: #8dd4a8;
+  --type-array: #e0a870;
+  --type-map: #d88a8a;
+  --type-union: #a0a8d4;
+  --type-ref: #c9a84c;
+  --badge-bg: #ffffff0a;
+  --badge-border: #ffffff15;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: #2a2a33;
+  --node-bg: #1a1a22;
+  --node-border: #2a2a35;
+  --edge-color: #3a3a45;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.6);
+  --graph-bg: #0a0a0d;
+}
+
+[data-theme="light"] {
+  --bg-primary: #f6f4f0;
+  --bg-secondary: #efede8;
+  --bg-tertiary: #e8e5df;
+  --bg-hover: #dedad3;
+  --bg-active: #d4d0c8;
+  --bg-card: #ffffff;
+  --border: #d4d0c8;
+  --border-subtle: #e0ddd6;
+  --text-primary: #1a1815;
+  --text-secondary: #6a6560;
+  --text-tertiary: #9a9590;
+  --accent: #9a7b2e;
+  --accent-dim: #9a7b2e15;
+  --accent-hover: #b8922f;
+  --type-primitive: #2e7da8;
+  --type-record: #8a4ea0;
+  --type-enum: #2e8a55;
+  --type-array: #b07a30;
+  --type-map: #a85050;
+  --type-union: #5060a0;
+  --type-ref: #9a7b2e;
+  --badge-bg: #0000000a;
+  --badge-border: #00000015;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: #d4d0c8;
+  --node-bg: #ffffff;
+  --node-border: #d4d0c8;
+  --edge-color: #c0bbb5;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
+  --graph-bg: #f0ede8;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+
+.app {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  grid-template-rows: 52px 1fr;
+  height: 100vh;
+}
+
+/* ───── Header ───── */
+header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  z-index: 100;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-mark {
+  width: 28px;
+  height: 28px;
+  background: var(--accent);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Instrument Serif', serif;
+  font-size: 16px;
+  color: #0c0c0e;
+  font-weight: 600;
+}
+
+.logo-text {
+  font-family: 'Instrument Serif', serif;
+  font-size: 20px;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+}
+
+.logo-text span {
+  color: var(--accent);
+  font-style: italic;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-toggle {
+  display: flex;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+}
+
+.view-toggle button {
+  padding: 5px 14px;
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.view-toggle button.active {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.theme-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  margin-left: 8px;
+}
+
+.theme-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* ───── Sidebar ───── */
+.sidebar {
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-search {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sidebar-search input {
+  width: 100%;
+  padding: 8px 12px;
+  padding-left: 32px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.sidebar-search input:focus { border-color: var(--accent); }
+
+.search-wrapper {
+  position: relative;
+}
+
+.search-wrapper::before {
+  content: '⌕';
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.tree-group {
+  margin-bottom: 2px;
+}
+
+.tree-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.tree-group-header:hover { color: var(--text-primary); }
+
+.tree-group-header .chevron {
+  font-size: 10px;
+  transition: transform 0.2s;
+  color: var(--text-tertiary);
+}
+
+.tree-group-header.collapsed .chevron { transform: rotate(-90deg); }
+
+.tree-project {
+  margin: 1px 0;
+}
+
+.tree-project-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px 5px 28px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  user-select: none;
+  transition: all 0.15s;
+}
+
+.tree-project-header:hover { color: var(--text-primary); background: var(--bg-hover); }
+.tree-project-header .chevron { font-size: 9px; color: var(--text-tertiary); transition: transform 0.2s; }
+.tree-project-header.collapsed .chevron { transform: rotate(-90deg); }
+
+.tree-project-header .folder-icon {
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+.tree-schema {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px 5px 52px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 400;
+  transition: all 0.15s;
+  border-left: 2px solid transparent;
+}
+
+.tree-schema:hover { background: var(--bg-hover); color: var(--text-primary); }
+.tree-schema.active { background: var(--accent-dim); color: var(--accent); border-left-color: var(--accent); }
+
+.tree-schema .schema-type-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tree-schema .schema-id {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-weight: 300;
+}
+
+.sidebar-stats {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  display: flex;
+  gap: 14px;
+}
+
+.sidebar-stats span { color: var(--text-secondary); font-weight: 500; }
+
+/* ───── Main ───── */
+main {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ───── Detail View ───── */
+.detail-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 36px;
+}
+
+.detail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-tertiary);
+  gap: 12px;
+}
+
+.detail-empty .empty-icon {
+  font-size: 48px;
+  opacity: 0.3;
+}
+
+.detail-empty p { font-size: 14px; }
+
+.schema-header {
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.schema-breadcrumb {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.schema-breadcrumb span { color: var(--text-secondary); }
+
+.schema-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 32px;
+  font-weight: 400;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.schema-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.meta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  background: var(--badge-bg);
+  border: 1px solid var(--badge-border);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.meta-badge.type-avro { border-color: var(--type-record); color: var(--type-record); }
+.meta-badge.type-proto { border-color: var(--type-enum); color: var(--type-enum); }
+
+.version-selector {
+  padding: 3px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  outline: none;
+}
+
+.schema-doc {
+  margin-top: 10px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 640px;
+}
+
+/* ───── Fields Table ───── */
+.fields-section {
+  margin-bottom: 32px;
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-tertiary);
+  margin-bottom: 12px;
+  padding-left: 2px;
+}
+
+.fields-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.fields-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border);
+}
+
+.fields-table td {
+  padding: 10px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+
+.fields-table tr:hover td { background: var(--bg-hover); }
+
+.field-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.field-required { color: var(--type-map); font-size: 10px; margin-left: 4px; }
+
+.field-type {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.field-type.primitive { color: var(--type-primitive); background: color-mix(in srgb, var(--type-primitive) 10%, transparent); }
+.field-type.record { color: var(--type-record); background: color-mix(in srgb, var(--type-record) 10%, transparent); }
+.field-type.enum { color: var(--type-enum); background: color-mix(in srgb, var(--type-enum) 10%, transparent); }
+.field-type.array { color: var(--type-array); background: color-mix(in srgb, var(--type-array) 10%, transparent); }
+.field-type.map { color: var(--type-map); background: color-mix(in srgb, var(--type-map) 10%, transparent); }
+.field-type.union { color: var(--type-union); background: color-mix(in srgb, var(--type-union) 10%, transparent); }
+.field-type.ref { color: var(--type-ref); background: color-mix(in srgb, var(--type-ref) 10%, transparent); cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+.field-type.ref:hover { text-decoration-style: solid; }
+
+.field-default {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.field-doc {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+/* Enum values display */
+.enum-values {
+  margin-top: 16px;
+  padding: 14px 18px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+
+.enum-values-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin-bottom: 10px;
+}
+
+.enum-value {
+  display: inline-block;
+  padding: 3px 10px;
+  margin: 2px 4px 2px 0;
+  background: color-mix(in srgb, var(--type-enum) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--type-enum) 25%, transparent);
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  color: var(--type-enum);
+}
+
+/* Nested field indent */
+.field-indent { padding-left: 24px !important; }
+.field-indent-2 { padding-left: 44px !important; }
+
+.field-expand-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 4px;
+  margin-right: 4px;
+  transition: transform 0.2s;
+}
+
+.field-expand-btn.expanded { transform: rotate(90deg); }
+
+/* ───── Graph View ───── */
+.graph-view {
+  flex: 1;
+  display: none;
+  position: relative;
+  background: var(--graph-bg);
+  overflow: hidden;
+}
+
+.graph-view.active { display: block; }
+.detail-view.hidden { display: none; }
+
+.graph-canvas {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+
+.graph-canvas:active { cursor: grabbing; }
+
+.graph-controls {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.graph-controls button {
+  width: 36px;
+  height: 36px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.graph-controls button:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.graph-legend {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 11px;
+  box-shadow: var(--shadow-md);
+}
+
+.graph-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  color: var(--text-secondary);
+}
+
+.graph-legend-item:last-child { margin-bottom: 0; }
+
+.graph-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* ───── Responsive ───── */
+@media (max-width: 768px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+}
+
+/* Animations */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fadeIn 0.3s ease-out; }
+
+.tree-schemas { overflow: hidden; transition: max-height 0.25s ease; }
+
+/* ───── Raw View ───── */
+.detail-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-tab {
+  padding: 8px 18px;
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  margin-bottom: -1px;
+}
+
+.detail-tab:hover { color: var(--text-secondary); }
+.detail-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.raw-view { display: none; }
+.raw-view.active { display: block; }
+.fields-view { display: none; }
+.fields-view.active { display: block; }
+
+.raw-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.format-toggle {
+  display: flex;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 2px;
+  border: 1px solid var(--border-subtle);
+}
+
+.format-toggle button {
+  padding: 4px 12px;
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.format-toggle button.active {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.raw-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.copy-btn {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.copy-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.copy-btn.copied { color: var(--type-enum); border-color: var(--type-enum); }
+
+.raw-code-block {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 18px 22px;
+  overflow: auto;
+  max-height: calc(100vh - 340px);
+}
+
+.raw-code-block pre {
+  margin: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  white-space: pre;
+  tab-size: 2;
+}
+
+.raw-code-block .json-key { color: var(--type-primitive); }
+.raw-code-block .json-string { color: var(--type-enum); }
+.raw-code-block .json-number { color: var(--type-array); }
+.raw-code-block .json-boolean { color: var(--type-record); }
+.raw-code-block .json-null { color: var(--text-tertiary); }
+.raw-code-block .yaml-key { color: var(--type-primitive); }
+.raw-code-block .yaml-string { color: var(--type-enum); }
+.raw-code-block .yaml-number { color: var(--type-array); }
+.raw-code-block .yaml-boolean { color: var(--type-record); }
+.raw-code-block .yaml-null { color: var(--text-tertiary); }
+.raw-code-block .yaml-comment { color: var(--text-tertiary); font-style: italic; }
+
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="logo">
+      <div class="logo-mark">V</div>
+      <div class="logo-text">Vasara <span>Datapedia</span></div>
+    </div>
+    <div class="header-controls">
+      <div class="view-toggle">
+        <button class="active" data-view="detail" onclick="setView('detail')">Schema</button>
+        <button data-view="graph" onclick="setView('graph')">Graph</button>
+      </div>
+      <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="sidebar">
+    <div class="sidebar-search">
+      <div class="search-wrapper">
+        <input type="text" placeholder="Search schemas..." oninput="filterTree(this.value)">
+      </div>
+    </div>
+    <div class="tree" id="tree"></div>
+    <div class="sidebar-stats">
+      <div><span id="stat-schemas">0</span> schemas</div>
+      <div><span id="stat-groups">0</span> groups</div>
+    </div>
+  </div>
+
+  <main>
+    <div class="detail-view" id="detailView">
+      <div class="detail-empty" id="emptyState">
+        <div class="empty-icon">◇</div>
+        <p>Select a schema to explore</p>
+      </div>
+      <div id="schemaDetail" style="display:none"></div>
+    </div>
+    <div class="graph-view" id="graphView">
+      <canvas class="graph-canvas" id="graphCanvas"></canvas>
+      <div class="graph-controls">
+        <button onclick="graphZoom(1.2)" title="Zoom in">+</button>
+        <button onclick="graphZoom(0.8)" title="Zoom out">−</button>
+        <button onclick="graphReset()" title="Reset">⟲</button>
+      </div>
+      <div class="graph-legend">
+        <div class="graph-legend-item"><div class="graph-legend-dot" style="background:var(--type-record)"></div> Record</div>
+        <div class="graph-legend-item"><div class="graph-legend-dot" style="background:var(--type-enum)"></div> Enum</div>
+        <div class="graph-legend-item"><div class="graph-legend-dot" style="background:var(--type-array)"></div> Array</div>
+        <div class="graph-legend-item"><div class="graph-legend-dot" style="background:var(--type-ref)"></div> Reference</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  SAMPLE DATA — Replace with real registry data / API call   ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+const REGISTRY = [
+  {
+    id: 1001,
+    group: "trading",
+    project: "orders",
+    name: "OrderEvent",
+    schemaType: "avro",
+    versions: [
+      { version: 1, doc: "Represents a trading order lifecycle event across all asset classes.", schema: {
+        type: "record", name: "OrderEvent", namespace: "com.vasara.schemas.trading.orders",
+        fields: [
+          { name: "orderId", type: "string", doc: "Globally unique order identifier (UUID v4)." },
+          { name: "timestamp", type: { type: "long", logicalType: "timestamp-millis" }, doc: "Event timestamp in epoch milliseconds." },
+          { name: "side", type: { type: "enum", name: "Side", symbols: ["BUY","SELL","SHORT_SELL"] }, doc: "Order side." },
+          { name: "orderType", type: { type: "enum", name: "OrderType", symbols: ["MARKET","LIMIT","STOP","STOP_LIMIT","IOC","FOK"] }, doc: "Execution order type." },
+          { name: "instrument", type: "InstrumentRef", refId: 1003, doc: "Reference to the traded instrument." },
+          { name: "quantity", type: "double", doc: "Order quantity in units." },
+          { name: "limitPrice", type: ["null","double"], doc: "Limit price if applicable.", default: null },
+          { name: "status", type: { type: "enum", name: "OrderStatus", symbols: ["NEW","PARTIALLY_FILLED","FILLED","CANCELLED","REJECTED","EXPIRED"] }, doc: "Current order status." },
+          { name: "trader", type: "TraderProfile", refId: 1006, doc: "Trader who placed the order." },
+          { name: "fills", type: { type: "array", items: "FillEvent" }, refId: 1002, doc: "Execution fills for this order." },
+          { name: "metadata", type: { type: "map", values: "string" }, doc: "Arbitrary key-value metadata." }
+        ]
+      }},
+      { version: 2, doc: "V2 adds algo routing fields and TIF support.", schema: {
+        type: "record", name: "OrderEvent", namespace: "com.vasara.schemas.trading.orders",
+        fields: [
+          { name: "orderId", type: "string", doc: "Globally unique order identifier." },
+          { name: "timestamp", type: { type: "long", logicalType: "timestamp-millis" }, doc: "Event timestamp." },
+          { name: "side", type: { type: "enum", name: "Side", symbols: ["BUY","SELL","SHORT_SELL"] }, doc: "Order side." },
+          { name: "orderType", type: { type: "enum", name: "OrderType", symbols: ["MARKET","LIMIT","STOP","STOP_LIMIT","IOC","FOK","TWAP","VWAP"] }, doc: "Execution order type including algo types." },
+          { name: "instrument", type: "InstrumentRef", refId: 1003, doc: "Traded instrument." },
+          { name: "quantity", type: "double", doc: "Quantity." },
+          { name: "limitPrice", type: ["null","double"], doc: "Limit price.", default: null },
+          { name: "timeInForce", type: { type: "enum", name: "TimeInForce", symbols: ["DAY","GTC","GTD","IOC","FOK"] }, doc: "Time in force policy." },
+          { name: "status", type: { type: "enum", name: "OrderStatus", symbols: ["NEW","PARTIALLY_FILLED","FILLED","CANCELLED","REJECTED","EXPIRED"] }, doc: "Order status." },
+          { name: "trader", type: "TraderProfile", refId: 1006, doc: "Trader." },
+          { name: "fills", type: { type: "array", items: "FillEvent" }, refId: 1002, doc: "Fills." },
+          { name: "algoParams", type: ["null",{ type: "map", values: "string" }], doc: "Algorithm parameters.", default: null },
+          { name: "metadata", type: { type: "map", values: "string" }, doc: "Metadata." }
+        ]
+      }}
+    ]
+  },
+  {
+    id: 1002,
+    group: "trading",
+    project: "orders",
+    name: "FillEvent",
+    schemaType: "avro",
+    versions: [{ version: 1, doc: "An individual execution fill against an order.", schema: {
+      type: "record", name: "FillEvent", namespace: "com.vasara.schemas.trading.orders",
+      fields: [
+        { name: "fillId", type: "string", doc: "Unique fill identifier." },
+        { name: "orderId", type: "string", doc: "Parent order ID." },
+        { name: "executionPrice", type: "double", doc: "Price at which the fill executed." },
+        { name: "executionQty", type: "double", doc: "Fill quantity." },
+        { name: "venue", type: "string", doc: "Execution venue code." },
+        { name: "timestamp", type: { type: "long", logicalType: "timestamp-millis" }, doc: "Fill timestamp." },
+        { name: "commission", type: "double", doc: "Commission charged." },
+        { name: "settlementDate", type: { type: "int", logicalType: "date" }, doc: "Expected settlement date." }
+      ]
+    }}]
+  },
+  {
+    id: 1003,
+    group: "trading",
+    project: "refdata",
+    name: "InstrumentRef",
+    schemaType: "avro",
+    versions: [{ version: 1, doc: "Reference data for a tradable financial instrument.", schema: {
+      type: "record", name: "InstrumentRef", namespace: "com.vasara.schemas.trading.refdata",
+      fields: [
+        { name: "symbol", type: "string", doc: "Ticker symbol." },
+        { name: "isin", type: ["null","string"], doc: "ISIN code.", default: null },
+        { name: "cusip", type: ["null","string"], doc: "CUSIP code.", default: null },
+        { name: "name", type: "string", doc: "Full instrument name." },
+        { name: "assetClass", type: { type: "enum", name: "AssetClass", symbols: ["EQUITY","FIXED_INCOME","FX","COMMODITY","DERIVATIVE","CRYPTO"] }, doc: "Asset classification." },
+        { name: "exchange", type: "string", doc: "Primary exchange code." },
+        { name: "currency", type: "string", doc: "Denomination currency (ISO 4217)." },
+        { name: "lotSize", type: "int", doc: "Standard lot size.", default: 1 }
+      ]
+    }}]
+  },
+  {
+    id: 1004,
+    group: "trading",
+    project: "refdata",
+    name: "PricingSnapshot",
+    schemaType: "avro",
+    versions: [{ version: 1, doc: "Point-in-time pricing data for a given instrument.", schema: {
+      type: "record", name: "PricingSnapshot", namespace: "com.vasara.schemas.trading.refdata",
+      fields: [
+        { name: "instrument", type: "InstrumentRef", refId: 1003, doc: "The instrument being priced." },
+        { name: "bidPrice", type: "double", doc: "Best bid price." },
+        { name: "askPrice", type: "double", doc: "Best ask price." },
+        { name: "midPrice", type: "double", doc: "Mid price." },
+        { name: "lastTradePrice", type: ["null","double"], doc: "Most recent trade price.", default: null },
+        { name: "volume", type: "long", doc: "Cumulative volume." },
+        { name: "timestamp", type: { type: "long", logicalType: "timestamp-millis" }, doc: "Snapshot timestamp." },
+        { name: "source", type: "string", doc: "Data source identifier." }
+      ]
+    }}]
+  },
+  {
+    id: 1005,
+    group: "risk",
+    project: "analytics",
+    name: "PositionRisk",
+    schemaType: "avro",
+    versions: [{ version: 1, doc: "Risk metrics computed at the individual position level, aggregated into portfolio-level views.", schema: {
+      type: "record", name: "PositionRisk", namespace: "com.vasara.schemas.risk.analytics",
+      fields: [
+        { name: "positionId", type: "string", doc: "Unique position identifier." },
+        { name: "portfolioId", type: "string", doc: "Owning portfolio." },
+        { name: "instrument", type: "InstrumentRef", refId: 1003, doc: "Instrument held." },
+        { name: "quantity", type: "double", doc: "Position size." },
+        { name: "marketValue", type: "double", doc: "Current market value." },
+        { name: "unrealizedPnl", type: "double", doc: "Unrealized P&L." },
+        { name: "var95", type: "double", doc: "95th percentile Value-at-Risk." },
+        { name: "var99", type: "double", doc: "99th percentile Value-at-Risk." },
+        { name: "beta", type: "double", doc: "Beta relative to benchmark." },
+        { name: "delta", type: ["null","double"], doc: "Option delta (derivatives only).", default: null },
+        { name: "gamma", type: ["null","double"], doc: "Option gamma.", default: null },
+        { name: "pricing", type: "PricingSnapshot", refId: 1004, doc: "Latest pricing for this position." },
+        { name: "asOfDate", type: { type: "int", logicalType: "date" }, doc: "Calculation date." }
+      ]
+    }}]
+  },
+  {
+    id: 1006,
+    group: "trading",
+    project: "identity",
+    name: "TraderProfile",
+    schemaType: "avro",
+    versions: [{ version: 1, doc: "Trader identity and entitlement profile.", schema: {
+      type: "record", name: "TraderProfile", namespace: "com.vasara.schemas.trading.identity",
+      fields: [
+        { name: "traderId", type: "string", doc: "Unique trader ID." },
+        { name: "displayName", type: "string", doc: "Human readable display name." },
+        { name: "desk", type: "string", doc: "Trading desk assignment." },
+        { name: "region", type: { type: "enum", name: "Region", symbols: ["AMER","EMEA","APAC"] }, doc: "Regulatory region." },
+        { name: "entitlements", type: { type: "array", items: "string" }, doc: "List of entitlement keys." },
+        { name: "isActive", type: "boolean", doc: "Whether the trader is currently active.", default: true }
+      ]
+    }}]
+  },
+  {
+    id: 1007,
+    group: "risk",
+    project: "analytics",
+    name: "StressTestResult",
+    schemaType: "avro",
+    versions: [{ version: 1, doc: "Results of a stress test scenario against a portfolio.", schema: {
+      type: "record", name: "StressTestResult", namespace: "com.vasara.schemas.risk.analytics",
+      fields: [
+        { name: "scenarioId", type: "string", doc: "Stress scenario identifier." },
+        { name: "scenarioName", type: "string", doc: "Human-readable scenario name." },
+        { name: "portfolioId", type: "string", doc: "Target portfolio." },
+        { name: "pnlImpact", type: "double", doc: "Estimated P&L impact." },
+        { name: "varShift", type: "double", doc: "VaR change under scenario." },
+        { name: "affectedPositions", type: { type: "array", items: "PositionRisk" }, refId: 1005, doc: "Positions affected by the scenario." },
+        { name: "computedAt", type: { type: "long", logicalType: "timestamp-millis" }, doc: "Computation timestamp." },
+        { name: "approved", type: "boolean", doc: "Whether reviewed and approved.", default: false }
+      ]
+    }}]
+  },
+  {
+    id: 1008,
+    group: "compliance",
+    project: "audit",
+    name: "AuditEntry",
+    schemaType: "avro",
+    versions: [{ version: 1, doc: "Immutable audit log entry for regulatory compliance and SOX reporting.", schema: {
+      type: "record", name: "AuditEntry", namespace: "com.vasara.schemas.compliance.audit",
+      fields: [
+        { name: "entryId", type: "string", doc: "Unique log entry ID." },
+        { name: "actor", type: "TraderProfile", refId: 1006, doc: "The user performing the action." },
+        { name: "action", type: { type: "enum", name: "AuditAction", symbols: ["CREATE","READ","UPDATE","DELETE","APPROVE","REJECT","EXPORT"] }, doc: "The action performed." },
+        { name: "resourceType", type: "string", doc: "Type of resource affected." },
+        { name: "resourceId", type: "string", doc: "ID of the affected resource." },
+        { name: "timestamp", type: { type: "long", logicalType: "timestamp-millis" }, doc: "When the action occurred." },
+        { name: "ipAddress", type: "string", doc: "Source IP address." },
+        { name: "details", type: { type: "map", values: "string" }, doc: "Additional context about the action." },
+        { name: "complianceFlags", type: { type: "array", items: "string" }, doc: "Applicable compliance tags (SOX, MiFID, etc.)." }
+      ]
+    }}]
+  },
+  {
+    id: 1009,
+    group: "compliance",
+    project: "audit",
+    name: "ComplianceAlert",
+    schemaType: "avro",
+    versions: [{ version: 1, doc: "Alert raised when compliance rules are breached.", schema: {
+      type: "record", name: "ComplianceAlert", namespace: "com.vasara.schemas.compliance.audit",
+      fields: [
+        { name: "alertId", type: "string", doc: "Alert identifier." },
+        { name: "severity", type: { type: "enum", name: "Severity", symbols: ["LOW","MEDIUM","HIGH","CRITICAL"] }, doc: "Alert severity." },
+        { name: "ruleId", type: "string", doc: "The compliance rule that triggered." },
+        { name: "triggeringEntry", type: "AuditEntry", refId: 1008, doc: "The audit entry that caused this alert." },
+        { name: "message", type: "string", doc: "Human-readable alert description." },
+        { name: "acknowledged", type: "boolean", doc: "Whether a compliance officer has reviewed.", default: false },
+        { name: "raisedAt", type: { type: "long", logicalType: "timestamp-millis" }, doc: "When the alert was raised." }
+      ]
+    }}]
+  },
+  {
+    id: 1010,
+    group: "risk",
+    project: "governance",
+    name: "ModelValidation",
+    schemaType: "avro",
+    versions: [{ version: 1, doc: "SR 11-7 model validation record for CCAR model governance.", schema: {
+      type: "record", name: "ModelValidation", namespace: "com.vasara.schemas.risk.governance",
+      fields: [
+        { name: "modelId", type: "string", doc: "Unique model identifier." },
+        { name: "modelName", type: "string", doc: "Human-readable model name." },
+        { name: "tier", type: { type: "enum", name: "ModelTier", symbols: ["TIER_1","TIER_2","TIER_3"] }, doc: "Model materiality tier per SR 11-7." },
+        { name: "validationStatus", type: { type: "enum", name: "ValidationStatus", symbols: ["PENDING","IN_REVIEW","APPROVED","CONDITIONALLY_APPROVED","REJECTED"] }, doc: "Current validation status." },
+        { name: "validator", type: "TraderProfile", refId: 1006, doc: "Assigned model validator." },
+        { name: "lastValidationDate", type: { type: "int", logicalType: "date" }, doc: "Date of most recent validation." },
+        { name: "findings", type: { type: "array", items: "string" }, doc: "Validation findings and observations." },
+        { name: "backtestResults", type: { type: "map", values: "double" }, doc: "Key backtest metrics." }
+      ]
+    }}]
+  }
+];
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  Build Indexes                                              ║
+// ╚══════════════════════════════════════════════════════════════╝
+const schemaById = {};
+REGISTRY.forEach(s => schemaById[s.id] = s);
+
+function getGroups() {
+  const groups = {};
+  REGISTRY.forEach(s => {
+    if (!groups[s.group]) groups[s.group] = {};
+    if (!groups[s.group][s.project]) groups[s.group][s.project] = [];
+    groups[s.group][s.project].push(s);
+  });
+  return groups;
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  Sidebar Tree                                               ║
+// ╚══════════════════════════════════════════════════════════════╝
+let activeSchemaId = null;
+
+function renderTree(filter = '') {
+  const tree = document.getElementById('tree');
+  const groups = getGroups();
+  const lf = filter.toLowerCase();
+  let html = '';
+  let totalSchemas = 0, totalGroups = 0;
+
+  for (const [groupName, projects] of Object.entries(groups).sort()) {
+    totalGroups++;
+    let groupHtml = '';
+    let groupHasMatch = false;
+
+    for (const [projName, schemas] of Object.entries(projects).sort()) {
+      let projHtml = '';
+      let projHasMatch = false;
+
+      for (const s of schemas.sort((a,b) => a.name.localeCompare(b.name))) {
+        totalSchemas++;
+        const matches = !lf || s.name.toLowerCase().includes(lf) || s.group.toLowerCase().includes(lf) || s.project.toLowerCase().includes(lf);
+        if (!matches) continue;
+        projHasMatch = true;
+        groupHasMatch = true;
+        const dotColor = s.schemaType === 'avro' ? 'var(--type-record)' : 'var(--type-enum)';
+        const active = activeSchemaId === s.id ? ' active' : '';
+        projHtml += `<div class="tree-schema${active}" onclick="selectSchema(${s.id})" data-id="${s.id}">
+          <span class="schema-type-dot" style="background:${dotColor}"></span>
+          ${s.name}
+          <span class="schema-id">#${s.id}</span>
+        </div>`;
+      }
+
+      if (projHasMatch) {
+        const collapsed = lf ? '' : '';
+        groupHtml += `<div class="tree-project">
+          <div class="tree-project-header${collapsed}" onclick="toggleProject(this)">
+            <span class="chevron">▶</span>
+            <span class="folder-icon">◈</span>
+            ${projName}
+          </div>
+          <div class="tree-schemas">${projHtml}</div>
+        </div>`;
+      }
+    }
+
+    if (groupHasMatch) {
+      html += `<div class="tree-group">
+        <div class="tree-group-header" onclick="toggleGroup(this)">
+          <span class="chevron">▼</span>
+          ${groupName}
+        </div>
+        <div class="tree-group-content">${groupHtml}</div>
+      </div>`;
+    }
+  }
+
+  tree.innerHTML = html || '<div class="detail-empty" style="height:100px;font-size:12px"><p>No schemas found</p></div>';
+  document.getElementById('stat-schemas').textContent = totalSchemas;
+  document.getElementById('stat-groups').textContent = totalGroups;
+}
+
+function toggleGroup(el) {
+  el.classList.toggle('collapsed');
+  const content = el.nextElementSibling;
+  content.style.display = el.classList.contains('collapsed') ? 'none' : '';
+}
+
+function toggleProject(el) {
+  el.classList.toggle('collapsed');
+  const content = el.nextElementSibling;
+  content.style.display = el.classList.contains('collapsed') ? 'none' : '';
+}
+
+function filterTree(val) { renderTree(val); }
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  Schema Detail View                                         ║
+// ╚══════════════════════════════════════════════════════════════╝
+let currentVersion = null;
+
+function selectSchema(id) {
+  activeSchemaId = id;
+  const s = schemaById[id];
+  if (!s) return;
+  currentVersion = s.versions.length;
+  renderTree(document.querySelector('.sidebar-search input').value);
+  renderDetail(s, s.versions[s.versions.length - 1]);
+  if (document.querySelector('.graph-view.active')) {
+    // When selecting from sidebar, re-root the graph and auto-expand root
+    graphRootId = id;
+    graphState.expandedNodes.clear();
+    graphState.expandedNodes.add(id);
+    graphState.panX = 0;
+    graphState.panY = 0;
+    renderGraph();
+  }
+}
+
+function renderDetail(s, ver) {
+  document.getElementById('emptyState').style.display = 'none';
+  const detail = document.getElementById('schemaDetail');
+  detail.style.display = '';
+  detail.classList.add('fade-in');
+  setTimeout(() => detail.classList.remove('fade-in'), 300);
+
+  const versionOptions = s.versions.map(v =>
+    `<option value="${v.version}" ${v.version === ver.version ? 'selected' : ''}>v${v.version}</option>`
+  ).join('');
+
+  let html = `<div class="schema-header">
+    <div class="schema-breadcrumb">${s.group} <span>/</span> ${s.project}</div>
+    <h1 class="schema-title">${s.name}</h1>
+    <div class="schema-meta">
+      <span class="meta-badge type-${s.schemaType}">${s.schemaType.toUpperCase()}</span>
+      <span class="meta-badge">ID #${s.id}</span>
+      <span class="meta-badge">${'com.vasara.schemas.' + s.group + '.' + s.project}</span>
+      <select class="version-selector" onchange="changeVersion(${s.id}, this.value)">${versionOptions}</select>
+    </div>
+    ${ver.doc ? `<p class="schema-doc">${ver.doc}</p>` : ''}
+  </div>`;
+
+  // Tabs
+  html += `<div class="detail-tabs">
+    <button class="detail-tab active" onclick="switchDetailTab('fields', this)">Fields</button>
+    <button class="detail-tab" onclick="switchDetailTab('json', this)">JSON</button>
+    <button class="detail-tab" onclick="switchDetailTab('yaml', this)">YAML</button>
+  </div>`;
+
+  // Fields tab
+  html += `<div class="fields-view active" id="fieldsTab">`;
+  if (ver.schema.fields && ver.schema.fields.length) {
+    html += `<div class="fields-section">
+      <div class="section-title">Fields (${ver.schema.fields.length})</div>
+      <table class="fields-table">
+        <thead><tr><th>Name</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>`;
+
+    for (const f of ver.schema.fields) {
+      html += renderFieldRow(f, 0);
+    }
+
+    html += `</tbody></table></div>`;
+  }
+  html += `</div>`;
+
+  // JSON tab
+  const cleanSchema = buildCleanSchema(s, ver);
+  html += `<div class="raw-view" id="jsonTab">
+    <div class="raw-toolbar">
+      <div class="raw-actions">
+        <button class="copy-btn" onclick="copyRawTab('json', this)">⎘ Copy</button>
+      </div>
+    </div>
+    <div class="raw-code-block"><pre id="detailJsonCode"></pre></div>
+  </div>`;
+
+  // YAML tab
+  html += `<div class="raw-view" id="yamlTab">
+    <div class="raw-toolbar">
+      <div class="raw-actions">
+        <button class="copy-btn" onclick="copyRawTab('yaml', this)">⎘ Copy</button>
+      </div>
+    </div>
+    <div class="raw-code-block"><pre id="detailYamlCode"></pre></div>
+  </div>`;
+
+  detail.innerHTML = html;
+
+  // Stash clean schema and render the code views
+  detail._cleanSchema = cleanSchema;
+  document.getElementById('detailJsonCode').innerHTML = syntaxHighlightJson(JSON.stringify(cleanSchema, null, 2));
+  document.getElementById('detailYamlCode').innerHTML = syntaxHighlightYaml(jsonToYaml(cleanSchema));
+}
+
+function renderFieldRow(f, depth) {
+  const indent = depth > 0 ? ` field-indent${depth > 1 ? '-2' : ''}` : '';
+  const typeInfo = resolveType(f.type, f.refId);
+  const isRequired = !isNullable(f.type);
+  const defaultVal = f.default !== undefined ? JSON.stringify(f.default) : '—';
+
+  let row = `<tr>
+    <td class="${indent}">
+      <span class="field-name">${f.name}</span>
+      ${isRequired ? '<span class="field-required">*</span>' : ''}
+    </td>
+    <td>${typeInfo.html}</td>
+    <td><span class="field-default">${defaultVal}</span></td>
+    <td><span class="field-doc">${f.doc || ''}</span></td>
+  </tr>`;
+
+  return row;
+}
+
+function resolveType(type, refId) {
+  if (typeof type === 'string') {
+    // Check if it's a reference to another schema
+    if (refId) {
+      const ref = schemaById[refId];
+      return { html: `<span class="field-type ref" onclick="selectSchema(${refId})" title="Jump to ${type}">${type} ↗</span>`, category: 'ref' };
+    }
+    const cat = primitiveCategory(type);
+    return { html: `<span class="field-type ${cat}">${type}</span>`, category: cat };
+  }
+
+  if (Array.isArray(type)) {
+    // Union
+    const parts = type.map(t => {
+      if (t === 'null') return '<span class="field-type primitive">null</span>';
+      return resolveType(t, refId).html;
+    });
+    return { html: parts.join(' <span style="color:var(--text-tertiary);font-size:11px">|</span> '), category: 'union' };
+  }
+
+  if (type && typeof type === 'object') {
+    if (type.type === 'enum') {
+      const symbols = type.symbols ? type.symbols.join(', ') : '';
+      return { html: `<span class="field-type enum" title="${symbols}">enum‹${type.name}›</span>`, category: 'enum' };
+    }
+    if (type.type === 'array') {
+      const itemType = typeof type.items === 'string' ? type.items : (type.items?.name || 'object');
+      if (refId) {
+        return { html: `<span class="field-type array">array‹<span class="field-type ref" onclick="selectSchema(${refId})" style="padding:0">${itemType} ↗</span>›</span>`, category: 'array' };
+      }
+      return { html: `<span class="field-type array">array‹${itemType}›</span>`, category: 'array' };
+    }
+    if (type.type === 'map') {
+      const valType = typeof type.values === 'string' ? type.values : 'object';
+      return { html: `<span class="field-type map">map‹string, ${valType}›</span>`, category: 'map' };
+    }
+    if (type.logicalType) {
+      return { html: `<span class="field-type primitive">${type.type}:${type.logicalType}</span>`, category: 'primitive' };
+    }
+    return { html: `<span class="field-type record">${type.name || type.type}</span>`, category: 'record' };
+  }
+
+  return { html: `<span class="field-type primitive">unknown</span>`, category: 'primitive' };
+}
+
+function primitiveCategory(type) {
+  const prims = ['null','boolean','int','long','float','double','bytes','string'];
+  return prims.includes(type) ? 'primitive' : 'record';
+}
+
+function isNullable(type) {
+  if (Array.isArray(type)) return type.includes('null');
+  return false;
+}
+
+function changeVersion(id, version) {
+  const s = schemaById[id];
+  const ver = s.versions.find(v => v.version == version);
+  if (ver) renderDetail(s, ver);
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  Graph View                                                  ║
+// ╚══════════════════════════════════════════════════════════════╝
+let graphState = { zoom: 1, panX: 0, panY: 0, dragging: false, dragStart: null, nodes: [], edges: [], expandedNodes: new Set() };
+let graphRootId = null;
+
+function setView(view) {
+  document.querySelectorAll('.view-toggle button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  const dv = document.getElementById('detailView');
+  const gv = document.getElementById('graphView');
+  if (view === 'graph') {
+    dv.classList.add('hidden');
+    gv.classList.add('active');
+    // Set graph root and auto-expand if a schema is selected
+    if (activeSchemaId) {
+      graphRootId = activeSchemaId;
+      if (!graphState.expandedNodes.has(activeSchemaId)) {
+        graphState.expandedNodes.add(activeSchemaId);
+      }
+    }
+    renderGraph();
+  } else {
+    dv.classList.remove('hidden');
+    gv.classList.remove('active');
+  }
+}
+
+function buildGraphData() {
+  const nodes = [];
+  const edges = [];
+  const nodeMap = {};
+  const expandedSet = graphState.expandedNodes;
+
+  // Use graphRootId as the root; fall back to activeSchemaId or all schemas
+  const rootId = graphRootId || activeSchemaId;
+  const rootIds = rootId ? [rootId] : REGISTRY.map(s => s.id);
+  const visited = new Set();
+
+  function addSchemaNode(id, depth = 0) {
+    if (visited.has(id)) return;
+    visited.add(id);
+    const s = schemaById[id];
+    if (!s) return;
+    const ver = s.versions[s.versions.length - 1];
+    const refs = [];
+
+    if (ver.schema.fields) {
+      ver.schema.fields.forEach(f => {
+        if (f.refId && schemaById[f.refId]) {
+          refs.push({ fieldName: f.name, targetId: f.refId });
+        }
+      });
+    }
+
+    nodes.push({ id: s.id, name: s.name, group: s.group, project: s.project, type: ver.schema.type, fieldCount: ver.schema.fields?.length || 0, fields: ver.schema.fields || [], refs, depth });
+    nodeMap[s.id] = nodes.length - 1;
+
+    refs.forEach(r => {
+      edges.push({ from: s.id, to: r.targetId, label: r.fieldName });
+      // Always expand depth 0 (root), otherwise respect expandedSet, or expand all if no root
+      if (depth === 0 || expandedSet.has(s.id) || !rootId) {
+        addSchemaNode(r.targetId, depth + 1);
+      }
+    });
+  }
+
+  rootIds.forEach(id => addSchemaNode(id));
+  return { nodes, edges, nodeMap };
+}
+
+function renderGraph() {
+  const canvas = document.getElementById('graphCanvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.offsetWidth * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  ctx.scale(dpr, dpr);
+
+  const W = canvas.offsetWidth;
+  const H = canvas.offsetHeight;
+
+  const { nodes, edges, nodeMap } = buildGraphData();
+  graphState.nodes = nodes;
+  graphState.edges = edges;
+
+  // Layout: simple force-directed-ish radial placement
+  const cx = W / 2 + graphState.panX;
+  const cy = H / 2 + graphState.panY;
+
+  if (nodes.length === 0) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '14px DM Sans';
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-tertiary');
+    ctx.textAlign = 'center';
+    ctx.fillText('Select a schema to view its graph', W/2, H/2);
+    return;
+  }
+
+  // Styles from CSS vars
+  const cs = getComputedStyle(document.documentElement);
+  const edgeColor = cs.getPropertyValue('--edge-color');
+  const nodeBg = cs.getPropertyValue('--node-bg');
+  const nodeBorder = cs.getPropertyValue('--node-border');
+  const textPrimary = cs.getPropertyValue('--text-primary');
+  const textSecondary = cs.getPropertyValue('--text-secondary');
+  const textTertiary = cs.getPropertyValue('--text-tertiary');
+  const accent = cs.getPropertyValue('--accent');
+
+  const z = graphState.zoom;
+  const nodeW = 220 * z;
+  const headerH = 36 * z;
+  const fieldRowH = 18 * z;
+  const nodeR = 8 * z;
+  const nodePadBottom = 8 * z;
+
+  // Compute node heights based on field count
+  nodes.forEach(n => {
+    n.nodeH = headerH + (n.fields.length * fieldRowH) + nodePadBottom;
+  });
+
+  // Position nodes in concentric rings by depth
+  const depthGroups = {};
+  nodes.forEach(n => {
+    if (!depthGroups[n.depth]) depthGroups[n.depth] = [];
+    depthGroups[n.depth].push(n);
+  });
+
+  const ringSpacing = 280 * z;
+  for (const [depth, group] of Object.entries(depthGroups)) {
+    const d = parseInt(depth);
+    const radius = d * ringSpacing;
+    group.forEach((n, i) => {
+      const angle = (2 * Math.PI * i / group.length) - Math.PI / 2;
+      if (d === 0 && group.length === 1) {
+        n.x = cx;
+        n.y = cy;
+      } else {
+        n.x = cx + radius * Math.cos(angle);
+        n.y = cy + radius * Math.sin(angle);
+      }
+    });
+  }
+
+  // Clear
+  ctx.clearRect(0, 0, W, H);
+
+  // Draw edges
+  edges.forEach(e => {
+    const fromNode = nodes.find(n => n.id === e.from);
+    const toNode = nodes.find(n => n.id === e.to);
+    if (!fromNode || !toNode) return;
+
+    ctx.beginPath();
+    ctx.strokeStyle = edgeColor;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+
+    // Find the field row for the edge label to connect from the right spot
+    const fieldIdx = fromNode.fields.findIndex(f => f.name === e.label);
+    const fromY = fieldIdx >= 0
+      ? fromNode.y - fromNode.nodeH / 2 + headerH + (fieldIdx + 0.5) * fieldRowH
+      : fromNode.y;
+    const fromX = fromNode.x + nodeW / 2;
+    const toX = toNode.x - nodeW / 2;
+    const toY = toNode.y;
+
+    ctx.moveTo(fromX, fromY);
+
+    // Curved edge
+    const cpX = (fromX + toX) / 2;
+    ctx.bezierCurveTo(cpX, fromY, cpX, toY, toX, toY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Arrow
+    const arrowSize = 7 * z;
+    ctx.beginPath();
+    ctx.fillStyle = edgeColor;
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(toX - arrowSize, toY - arrowSize * 0.5);
+    ctx.lineTo(toX - arrowSize, toY + arrowSize * 0.5);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  // Type color helper
+  function fieldTypeColor(f) {
+    if (f.refId) return cs.getPropertyValue('--type-ref').trim();
+    const t = f.type;
+    if (typeof t === 'string') {
+      const prims = ['null','boolean','int','long','float','double','bytes','string'];
+      return prims.includes(t) ? cs.getPropertyValue('--type-primitive').trim() : cs.getPropertyValue('--type-record').trim();
+    }
+    if (Array.isArray(t)) return cs.getPropertyValue('--type-union').trim();
+    if (t && typeof t === 'object') {
+      if (t.type === 'enum') return cs.getPropertyValue('--type-enum').trim();
+      if (t.type === 'array') return cs.getPropertyValue('--type-array').trim();
+      if (t.type === 'map') return cs.getPropertyValue('--type-map').trim();
+      if (t.logicalType) return cs.getPropertyValue('--type-primitive').trim();
+    }
+    return cs.getPropertyValue('--text-secondary').trim();
+  }
+
+  function fieldTypeLabel(f) {
+    if (f.refId) {
+      const t = typeof f.type === 'string' ? f.type : (f.type?.items || f.type?.name || 'ref');
+      return typeof t === 'string' ? t : 'ref';
+    }
+    const t = f.type;
+    if (typeof t === 'string') return t;
+    if (Array.isArray(t)) return t.map(x => typeof x === 'string' ? x : x?.name || '?').join('|');
+    if (t && typeof t === 'object') {
+      if (t.type === 'enum') return 'enum';
+      if (t.type === 'array') {
+        const items = typeof t.items === 'string' ? t.items : t.items?.name || '?';
+        return items + '[]';
+      }
+      if (t.type === 'map') return 'map<' + (typeof t.values === 'string' ? t.values : '?') + '>';
+      if (t.logicalType) return t.logicalType;
+      return t.name || t.type;
+    }
+    return '?';
+  }
+
+  // Draw nodes
+  nodes.forEach(n => {
+    const x = n.x - nodeW / 2;
+    const y = n.y - n.nodeH / 2;
+    const isActive = n.id === activeSchemaId;
+
+    // Shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.2)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+
+    // Node body
+    ctx.beginPath();
+    ctx.roundRect(x, y, nodeW, n.nodeH, nodeR);
+    ctx.fillStyle = nodeBg;
+    ctx.fill();
+    ctx.strokeStyle = isActive ? accent : nodeBorder;
+    ctx.lineWidth = isActive ? 2 : 1;
+    ctx.stroke();
+
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Header bar background
+    const typeColor = n.type === 'record' ? cs.getPropertyValue('--type-record') : cs.getPropertyValue('--type-enum');
+    ctx.beginPath();
+    ctx.roundRect(x, y, nodeW, headerH, [nodeR, nodeR, 0, 0]);
+    ctx.fillStyle = typeColor.trim();
+    ctx.globalAlpha = 0.12;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Left accent bar
+    ctx.beginPath();
+    ctx.roundRect(x, y, 4, n.nodeH, [nodeR, 0, 0, nodeR]);
+    ctx.fillStyle = typeColor.trim();
+    ctx.fill();
+
+    // Header: name
+    const titleSize = Math.max(10, 12 * z);
+    ctx.font = `600 ${titleSize}px DM Sans`;
+    ctx.fillStyle = textPrimary;
+    ctx.textAlign = 'left';
+    ctx.fillText(n.name, x + 12, y + headerH * 0.62);
+
+    // Header: expand indicator
+    if (n.refs.length > 0) {
+      const expanded = n.depth === 0 || graphState.expandedNodes.has(n.id);
+      ctx.font = `${Math.max(8, 10 * z)}px DM Sans`;
+      ctx.fillStyle = accent;
+      ctx.textAlign = 'right';
+      ctx.fillText(expanded ? '−' : '+' + n.refs.length, x + nodeW - 10, y + headerH * 0.62);
+    }
+
+    // Divider line
+    ctx.beginPath();
+    ctx.moveTo(x + 8, y + headerH);
+    ctx.lineTo(x + nodeW - 8, y + headerH);
+    ctx.strokeStyle = nodeBorder;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    // Fields
+    const fieldFontSize = Math.max(8, 10 * z);
+    const typeFontSize = Math.max(7, 9 * z);
+    n.fields.forEach((f, i) => {
+      const fy = y + headerH + (i + 0.65) * fieldRowH;
+      const isRef = !!f.refId;
+      const tColor = fieldTypeColor(f);
+
+      // Type dot
+      ctx.beginPath();
+      ctx.arc(x + 14, fy - 1, 2.5 * z, 0, Math.PI * 2);
+      ctx.fillStyle = tColor;
+      ctx.fill();
+
+      // Field name
+      ctx.font = `${fieldFontSize}px JetBrains Mono`;
+      ctx.fillStyle = isRef ? accent : textSecondary;
+      ctx.textAlign = 'left';
+      const nameText = f.name + (isRef ? ' ↗' : '');
+      ctx.fillText(nameText, x + 22, fy);
+
+      // Type label (right-aligned)
+      const label = fieldTypeLabel(f);
+      ctx.font = `${typeFontSize}px JetBrains Mono`;
+      ctx.fillStyle = tColor;
+      ctx.textAlign = 'right';
+      // Truncate long type labels
+      const maxTypeW = nodeW * 0.38;
+      let displayLabel = label;
+      while (ctx.measureText(displayLabel).width > maxTypeW && displayLabel.length > 4) {
+        displayLabel = displayLabel.slice(0, -2) + '…';
+      }
+      ctx.fillText(displayLabel, x + nodeW - 10, fy);
+    });
+
+    // Store hit area
+    n.hitBox = { x, y, w: nodeW, h: n.nodeH };
+  });
+}
+
+// Canvas interactions
+const canvas = document.getElementById('graphCanvas');
+
+canvas.addEventListener('mousedown', e => {
+  graphState.dragging = true;
+  graphState.dragStart = { x: e.clientX - graphState.panX, y: e.clientY - graphState.panY };
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!graphState.dragging) return;
+  graphState.panX = e.clientX - graphState.dragStart.x;
+  graphState.panY = e.clientY - graphState.dragStart.y;
+  renderGraph();
+});
+
+canvas.addEventListener('mouseup', () => { graphState.dragging = false; });
+canvas.addEventListener('mouseleave', () => { graphState.dragging = false; });
+
+canvas.addEventListener('click', e => {
+  if (graphState.dragging) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  for (const n of graphState.nodes) {
+    if (!n.hitBox) continue;
+    if (mx >= n.hitBox.x && mx <= n.hitBox.x + n.hitBox.w && my >= n.hitBox.y && my <= n.hitBox.y + n.hitBox.h) {
+      // Toggle expanded on this node (keeps graph root stable)
+      if (graphState.expandedNodes.has(n.id)) {
+        graphState.expandedNodes.delete(n.id);
+      } else {
+        graphState.expandedNodes.add(n.id);
+      }
+      // Update active selection for highlighting, but don't re-root
+      activeSchemaId = n.id;
+      renderTree(document.querySelector('.sidebar-search input').value);
+      renderGraph();
+      // Update detail view to show the clicked schema
+      const s = schemaById[n.id];
+      if (s) renderDetail(s, s.versions[s.versions.length - 1]);
+      return;
+    }
+  }
+});
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 0.92 : 1.08;
+  graphState.zoom = Math.max(0.3, Math.min(3, graphState.zoom * factor));
+  renderGraph();
+}, { passive: false });
+
+function graphZoom(factor) {
+  graphState.zoom = Math.max(0.3, Math.min(3, graphState.zoom * factor));
+  renderGraph();
+}
+
+function graphReset() {
+  graphState.zoom = 1;
+  graphState.panX = 0;
+  graphState.panY = 0;
+  renderGraph();
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  Theme Toggle                                                ║
+// ╚══════════════════════════════════════════════════════════════╝
+function toggleTheme() {
+  const html = document.documentElement;
+  const current = html.getAttribute('data-theme');
+  html.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+  // Re-render graph if visible
+  if (document.querySelector('.graph-view.active')) {
+    setTimeout(renderGraph, 50);
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  Raw View — JSON / YAML helpers                              ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+/** Build a clean Avro-style schema object from the registry entry (strips internal refId etc.) */
+function buildCleanSchema(s, ver) {
+  const schema = JSON.parse(JSON.stringify(ver.schema));
+  schema.namespace = 'com.vasara.schemas.' + s.group + '.' + s.project;
+  // Strip internal refId from fields recursively
+  function cleanFields(fields) {
+    if (!fields) return;
+    fields.forEach(f => {
+      delete f.refId;
+      if (f.type && typeof f.type === 'object' && !Array.isArray(f.type)) {
+        if (f.type.fields) cleanFields(f.type.fields);
+      }
+    });
+  }
+  cleanFields(schema.fields);
+  return schema;
+}
+
+/** Minimal JSON-to-YAML converter */
+function jsonToYaml(obj, indent = 0) {
+  const pad = '  '.repeat(indent);
+  if (obj === null || obj === undefined) return pad + 'null';
+  if (typeof obj === 'boolean') return pad + String(obj);
+  if (typeof obj === 'number') return pad + String(obj);
+  if (typeof obj === 'string') {
+    if (obj.includes('\n') || obj.includes(': ') || obj.includes('#') || obj.includes('"') || obj.includes("'")
+        || obj === '' || obj === 'true' || obj === 'false' || obj === 'null' || /^\d/.test(obj)) {
+      return pad + '"' + obj.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+    }
+    return pad + obj;
+  }
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) return pad + '[]';
+    // Check if all items are simple scalars
+    const allSimple = obj.every(v => v === null || typeof v !== 'object');
+    if (allSimple) {
+      const items = obj.map(v => {
+        if (v === null) return 'null';
+        if (typeof v === 'string') {
+          if (v === 'null' || v === 'true' || v === 'false' || /^\d/.test(v) || v.includes(': ')) return '"' + v + '"';
+          return v;
+        }
+        return String(v);
+      });
+      return pad + '[' + items.join(', ') + ']';
+    }
+    return obj.map(v => {
+      if (v === null || typeof v !== 'object') {
+        const sv = v === null ? 'null' : typeof v === 'string' ? yamlScalar(v) : String(v);
+        return pad + '- ' + sv;
+      }
+      // Object array item: first key goes on the "- " line, rest aligned beneath it
+      const keys = Object.keys(v);
+      if (keys.length === 0) return pad + '- {}';
+      const contPad = pad + '  '; // aligns with char after "- "
+      return keys.map((k, i) => {
+        const val = v[k];
+        const prefix = i === 0 ? (pad + '- ') : contPad;
+        return renderYamlKeyValue(prefix, k, val, indent + 1);
+      }).join('\n');
+    }).join('\n');
+  }
+  if (typeof obj === 'object') {
+    const keys = Object.keys(obj);
+    if (keys.length === 0) return pad + '{}';
+    return keys.map(k => {
+      return renderYamlKeyValue(pad, k, obj[k], indent);
+    }).join('\n');
+  }
+  return pad + String(obj);
+}
+
+function renderYamlKeyValue(prefix, key, val, indent) {
+  if (val === null || val === undefined) return prefix + key + ': null';
+  if (typeof val !== 'object') {
+    return prefix + key + ': ' + yamlScalar(val);
+  }
+  if (Array.isArray(val)) {
+    const allSimple = val.every(x => x === null || typeof x !== 'object');
+    if (allSimple) {
+      return prefix + key + ': ' + jsonToYaml(val, 0).trim();
+    }
+    return prefix + key + ':\n' + jsonToYaml(val, indent + 1);
+  }
+  // Nested object
+  return prefix + key + ':\n' + jsonToYaml(val, indent + 1);
+}
+
+function yamlScalar(v) {
+  if (typeof v === 'boolean' || typeof v === 'number') return String(v);
+  if (typeof v === 'string') {
+    if (v === 'null' || v === 'true' || v === 'false' || /^\d/.test(v)
+        || v.includes(': ') || v.includes('#') || v.includes('"') || v.includes("'")
+        || v === '' || v.includes('\n')) {
+      return '"' + v.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+    }
+    return v;
+  }
+  return String(v);
+}
+
+/** Syntax-highlight JSON string — token-based, HTML-safe */
+function syntaxHighlightJson(json) {
+  // First HTML-escape the entire string, then highlight tokens
+  const escaped = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Process token by token using a state-aware regex
+  return escaped.replace(
+    /("(?:\\.|[^"\\])*")(\s*:)?|(\b(?:true|false)\b)|(\bnull\b)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
+    function(match, str, colon, bool, nil, num) {
+      if (str) {
+        if (colon) {
+          // It's a key
+          return '<span class="json-key">' + str + '</span>' + colon;
+        }
+        // It's a string value
+        return '<span class="json-string">' + str + '</span>';
+      }
+      if (bool) return '<span class="json-boolean">' + match + '</span>';
+      if (nil) return '<span class="json-null">' + match + '</span>';
+      if (num) return '<span class="json-number">' + match + '</span>';
+      return match;
+    }
+  );
+}
+
+/** Syntax-highlight YAML string */
+function syntaxHighlightYaml(yaml) {
+  return yaml.split('\n').map(line => {
+    // Comments
+    if (/^\s*#/.test(line)) return '<span class="yaml-comment">' + esc(line) + '</span>';
+    // Key: value lines
+    const m = line.match(/^(\s*)([\w.-]+)(\s*:\s*)(.*)/);
+    if (m) {
+      let val = m[4];
+      val = highlightYamlValue(val);
+      return m[1] + '<span class="yaml-key">' + esc(m[2]) + '</span>' + esc(m[3]) + val;
+    }
+    // Array items
+    const a = line.match(/^(\s*-\s*)(.*)/);
+    if (a) {
+      return esc(a[1]) + highlightYamlValue(a[2]);
+    }
+    return esc(line);
+  }).join('\n');
+}
+
+function highlightYamlValue(val) {
+  if (!val || val.trim() === '') return val;
+  const t = val.trim();
+  if (t === 'null') return '<span class="yaml-null">' + esc(val) + '</span>';
+  if (t === 'true' || t === 'false') return '<span class="yaml-boolean">' + esc(val) + '</span>';
+  if (/^-?\d+\.?\d*$/.test(t)) return '<span class="yaml-number">' + esc(val) + '</span>';
+  if (t.startsWith('"') || t.startsWith("'")) return '<span class="yaml-string">' + esc(val) + '</span>';
+  if (t.startsWith('[')) {
+    // Inline array
+    return '<span class="yaml-string">' + esc(val) + '</span>';
+  }
+  return esc(val);
+}
+
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ── Detail view tab switching ──
+
+function switchDetailTab(tab, btn) {
+  document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('fieldsTab').classList.toggle('active', tab === 'fields');
+  document.getElementById('jsonTab').classList.toggle('active', tab === 'json');
+  document.getElementById('yamlTab').classList.toggle('active', tab === 'yaml');
+}
+
+function copyRawTab(fmt, btn) {
+  const detail = document.getElementById('schemaDetail');
+  if (!detail._cleanSchema) return;
+  const text = fmt === 'yaml'
+    ? jsonToYaml(detail._cleanSchema)
+    : JSON.stringify(detail._cleanSchema, null, 2);
+  navigator.clipboard.writeText(text).then(() => {
+    btn.classList.add('copied');
+    btn.innerHTML = '✓ Copied';
+    setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = '⎘ Copy'; }, 1500);
+  });
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  Init                                                        ║
+// ╚══════════════════════════════════════════════════════════════╝
+renderTree();
+
+window.addEventListener('resize', () => {
+  if (document.querySelector('.graph-view.active')) renderGraph();
+});
+</script>
+</body>
+</html>
