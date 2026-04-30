@@ -1,0 +1,111 @@
+id: fx-spot
+name: FX Spot Workflow
+description: >
+  Foreign exchange spot trade lifecycle: deal capture, confirmation, automated
+  rate enrichment via Python, and matching that may succeed or fail.
+initialState: DEAL_CAPTURED
+
+states:
+
+  - name: DEAL_CAPTURED
+    description: FX deal has been captured from the trading desk.
+
+  - name: CONFIRMED
+    description: Deal confirmed with counterparty; rate locked in.
+    autoEvents:
+      - AUTO_ENRICH_RATE
+
+  - name: RATE_ENRICHED
+    description: Settlement rate enriched and SSI populated.
+    autoEvents:
+      - AUTO_MATCH
+
+  - name: MATCHED
+    description: Deal matched against counterparty confirmation.
+
+  - name: SETTLED
+    description: FX deal fully settled.
+
+  - name: UNMATCHED
+    description: Deal could not be matched; requires manual intervention.
+
+events:
+
+  - name: CONFIRM
+    description: Confirm the FX deal with the counterparty.
+    fromState: DEAL_CAPTURED
+    trigger: EXTERNAL
+    type: DECLARATIVE
+    outcomes:
+      - name: ok
+        toState: CONFIRMED
+        set:
+          confirmedAt: "${now}"
+
+  - name: AUTO_ENRICH_RATE
+    description: Automatically enrich the trade with settlement rate and SSI data.
+    fromState: CONFIRMED
+    trigger: AUTO
+    type: PYTHON
+    outcomes:
+      - name: enriched
+        toState: RATE_ENRICHED
+    script: |
+      import datetime
+
+      def execute(metadata):
+          buy_ccy  = metadata.get('buyCurrency',  'USD')
+          sell_ccy = metadata.get('sellCurrency', 'EUR')
+          metadata['settlementRate'] = 1.0850
+          metadata['rateSource']     = 'SIMULATED'
+          metadata['ssi']            = buy_ccy + '_SSI_12345'
+          metadata['enrichedAt']     = datetime.datetime.utcnow().isoformat() + 'Z'
+          return {'outcome': 'enriched', 'metadata': metadata}
+
+  - name: AUTO_MATCH
+    description: >
+      Try to match the enriched deal with the counterparty confirmation.
+      Branches to MATCHED on a successful match, UNMATCHED otherwise.
+    fromState: RATE_ENRICHED
+    trigger: AUTO
+    type: JAVASCRIPT
+    outcomes:
+      - name: matched
+        toState: MATCHED
+      - name: unmatched
+        toState: UNMATCHED
+    script: |
+      function execute(metadata) {
+        var ref     = (metadata.confirmationRef || '').trim();
+        var matched = ref.length > 0;
+        if (matched) {
+          metadata.matchedAt = new Date().toISOString();
+          return { outcome: 'matched', metadata: metadata };
+        }
+        metadata.unmatchedAt = new Date().toISOString();
+        return { outcome: 'unmatched', metadata: metadata };
+      }
+
+  - name: SETTLE
+    description: Settle the matched FX deal.
+    fromState: MATCHED
+    trigger: EXTERNAL
+    type: DECLARATIVE
+    outcomes:
+      - name: ok
+        toState: SETTLED
+        set:
+          settledAt: "${now}"
+
+  - name: REMATCH
+    description: Re-attempt matching after manual correction.
+    fromState: UNMATCHED
+    trigger: EXTERNAL
+    type: DECLARATIVE
+    outcomes:
+      - name: ok
+        toState: RATE_ENRICHED
+        set:
+          rematchAttemptedAt: "${now}"
+        unset:
+          - unmatchedAt

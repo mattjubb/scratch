@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Trade Workflow System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link href="style.css" rel="stylesheet"/>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">Trade<span>Flow</span></div>
+    <div class="tagline">Finite-State Machine Workflow Engine</div>
+  </div>
+  <div class="spacer"></div>
+  <span class="badge" id="api-status">● Connecting…</span>
+</header>
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="section-header">
+      Workflows
+      <button onclick="openNewWorkflowModal()">+ New</button>
+    </div>
+    <div class="list" id="workflow-list">
+      <div style="padding:14px;color:var(--text-muted);font-size:12px">Loading…</div>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <div class="toolbar">
+      <div>
+        <div class="wf-title" id="wf-title">Select a workflow</div>
+        <div class="wf-desc"  id="wf-desc">Choose a workflow from the left panel to inspect it</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn"        onclick="openAddStateModal()"     id="btn-add-state" disabled>+ State</button>
+      <button class="btn"        onclick="openAddEventModal()"     id="btn-add-event" disabled>+ Event</button>
+      <button class="btn danger" onclick="deleteCurrentWorkflow()" id="btn-del-wf"    disabled>Delete</button>
+    </div>
+
+    <div class="view-tabs" id="view-tabs" style="display:none">
+      <button class="view-tab active" data-view="graph" onclick="switchView('graph', this)">⬡ Graph</button>
+      <button class="view-tab"        data-view="forms" onclick="switchView('forms', this)">☰ Forms</button>
+      <button class="view-tab"        data-view="yaml"  onclick="switchView('yaml',  this)">{ } YAML</button>
+    </div>
+
+    <!-- Graph view: container has explicit relative positioning -->
+    <div id="view-graph" class="view-pane">
+      <div id="graph-network"></div>
+      <div class="graph-empty" id="graph-empty">
+        <div class="icon">⬡</div>
+        <div>Select a workflow to view its graph</div>
+      </div>
+    </div>
+
+    <div id="view-forms" class="view-pane" style="display:none">
+      <div class="forms-layout">
+        <div class="forms-col">
+          <div class="forms-col-header">States <span class="forms-count" id="states-count">0</span></div>
+          <div id="states-list" class="forms-items"></div>
+        </div>
+        <div class="forms-col">
+          <div class="forms-col-header">Events <span class="forms-count" id="events-count">0</span></div>
+          <div id="events-list" class="forms-items"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-yaml" class="view-pane" style="display:none">
+      <div class="yaml-container">
+        <div class="yaml-toolbar">
+          <span class="yaml-filename" id="yaml-filename">workflow.yaml</span>
+          <div class="spacer"></div>
+          <button class="btn" onclick="copyYaml()">Copy</button>
+          <button class="btn" onclick="downloadYaml()">⬇ Download</button>
+        </div>
+        <pre id="yaml-content" class="yaml-pre"><span style="color:var(--text-muted)">Select a workflow…</span></pre>
+      </div>
+    </div>
+
+  </main>
+
+  <aside class="panel">
+    <div class="panel-header">
+      <span id="panel-title">Details</span>
+      <span id="panel-subtitle" style="font-size:11px;color:var(--text-muted)"></span>
+    </div>
+    <div class="panel-body" id="panel-body">
+      <p style="color:var(--text-muted);font-size:13px;line-height:1.6">
+        Click a state or event in the Graph or Forms view to inspect it here.
+      </p>
+    </div>
+  </aside>
+
+</div>
+
+<!-- ═══════════════════════════ MODALS ══════════════════════════════════════ -->
+
+<div class="modal-overlay hidden" id="modal-new-workflow">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>New Workflow</h2>
+      <button class="modal-close" onclick="closeModal('modal-new-workflow')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Name *</label>
+        <input id="nwf-name" class="form-control" placeholder="e.g. Bond Issuance Workflow"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea id="nwf-desc" class="form-control" rows="2"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Initial State Name *</label>
+        <input id="nwf-initial" class="form-control" placeholder="e.g. DRAFT"/>
+        <div class="form-hint">A first state will be created automatically with this name.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-new-workflow')">Cancel</button>
+      <button class="btn primary" onclick="createWorkflow()">Create</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="modal-state">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-state-title">Add State</h2>
+      <button class="modal-close" onclick="closeModal('modal-state')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">State Name *</label>
+        <input id="st-name" class="form-control" placeholder="e.g. APPROVED"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input id="st-desc" class="form-control"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Auto Events (comma-separated names)</label>
+        <input id="st-auto-events" class="form-control" placeholder="AUTO_NOTIFY, AUTO_ENRICH"/>
+        <div class="form-hint">AUTO events fired immediately when a trade enters this state.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-state')">Cancel</button>
+      <button class="btn primary" onclick="saveState()">Save State</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="modal-event">
+  <div class="modal" style="width:680px">
+    <div class="modal-header">
+      <h2 id="modal-event-title">Add Event</h2>
+      <button class="modal-close" onclick="closeModal('modal-event')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Event Name *</label>
+          <input id="ev-name" class="form-control" placeholder="e.g. PROCESS"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Trigger *</label>
+          <select id="ev-trigger" class="form-control">
+            <option value="EXTERNAL">EXTERNAL — API call</option>
+            <option value="AUTO">AUTO — fires on state entry</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">From State *</label>
+          <select id="ev-from" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Type *</label>
+          <select id="ev-type" class="form-control" onchange="onEventTypeChange()">
+            <option value="DECLARATIVE">Declarative (when / set / unset)</option>
+            <option value="JAVASCRIPT">JavaScript (Rhino)</option>
+            <option value="PYTHON">Python (Jython)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input id="ev-desc" class="form-control"/>
+      </div>
+      <div id="ev-script-section" style="display:none">
+        <div class="form-group">
+          <label class="form-label">
+            Script — define <code>execute(metadata)</code> returning
+            <code>{ outcome, metadata }</code>
+          </label>
+          <textarea id="ev-script" class="form-control" rows="10"
+            placeholder="function execute(metadata) {&#10;  if (metadata.amount > 0) {&#10;    return { outcome: 'success', metadata: metadata };&#10;  }&#10;  return { outcome: 'failure', metadata: metadata };&#10;}"></textarea>
+        </div>
+      </div>
+      <div class="form-group">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <label class="form-label" style="margin:0">Outcomes *</label>
+          <button class="btn" type="button" onclick="addOutcomeRow()" style="height:28px;padding:0 10px;font-size:12px">+ Add outcome</button>
+        </div>
+        <div class="form-hint" style="margin-top:0;margin-bottom:10px">
+          Each event must declare at least one outcome. For DECLARATIVE branching,
+          add multiple outcomes and use <code>when</code> predicates
+          (e.g. <code>amount &gt;= 1000</code>); first match wins.
+          For scripts, the script returns an outcome <code>name</code> to pick the branch.
+        </div>
+        <div id="outcomes-editor"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-event')">Cancel</button>
+      <button class="btn primary" onclick="saveEvent()">Save Event</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+<script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+<script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,156 @@
+id: trade-settlement
+name: Trade Settlement Workflow
+description: >
+  Full lifecycle of a securities trade from booking through settlement.
+  Automatic validation fires on submission and may branch to either VALIDATED
+  or FAILED depending on the script outcome.
+initialState: BOOKED
+
+states:
+
+  - name: BOOKED
+    description: Trade has been captured and is awaiting submission.
+
+  - name: SUBMITTED
+    description: Trade submitted for validation processing.
+    autoEvents:
+      - AUTO_VALIDATE
+
+  - name: VALIDATED
+    description: Trade passed all validation checks; awaiting settlement scheduling.
+
+  - name: PENDING_SETTLEMENT
+    description: Settlement date confirmed; awaiting settlement execution.
+
+  - name: SETTLED
+    description: Trade has been fully settled.
+
+  - name: FAILED
+    description: Trade failed validation or settlement.
+
+  - name: CANCELLED
+    description: Trade was cancelled before settlement.
+
+events:
+
+  - name: SUBMIT
+    description: Submit the trade for validation.
+    fromState: BOOKED
+    trigger: EXTERNAL
+    type: DECLARATIVE
+    outcomes:
+      - name: ok
+        toState: SUBMITTED
+        set:
+          submittedAt: "${now}"
+
+  - name: AUTO_VALIDATE
+    description: >
+      Automatically validates the trade. Branches to VALIDATED on success
+      or FAILED when amount ≤ 0, counterparty is missing, or instrument is missing.
+    fromState: SUBMITTED
+    trigger: AUTO
+    type: JAVASCRIPT
+    outcomes:
+      - name: success
+        toState: VALIDATED
+      - name: failure
+        toState: FAILED
+    script: |
+      function execute(metadata) {
+        var amount        = parseFloat(metadata.amount || '0');
+        var counterparty  = (metadata.counterparty || '').trim();
+        var instrument    = (metadata.instrument   || '').trim();
+        if (amount > 0 && counterparty.length > 0 && instrument.length > 0) {
+          metadata.validatedAt = new Date().toISOString();
+          return { outcome: 'success', metadata: metadata };
+        }
+        var reasons = [];
+        if (amount <= 0)               reasons.push('amount must be > 0');
+        if (counterparty.length === 0) reasons.push('counterparty is required');
+        if (instrument.length === 0)   reasons.push('instrument is required');
+        metadata.failureReason = reasons.join('; ');
+        metadata.failedAt      = new Date().toISOString();
+        return { outcome: 'failure', metadata: metadata };
+      }
+
+  - name: SCHEDULE_SETTLEMENT
+    description: >
+      Set the settlement date. Branches to standard or expedited settlement
+      based on trade size (declarative branching via 'when' on metadata).
+    fromState: VALIDATED
+    trigger: EXTERNAL
+    type: DECLARATIVE
+    outcomes:
+      - name: expedited
+        toState: PENDING_SETTLEMENT
+        when: "amount >= 1000000"
+        set:
+          settlementType: expedited
+          settlementScheduledAt: "${now}"
+      - name: standard
+        toState: PENDING_SETTLEMENT
+        set:
+          settlementType: standard
+          settlementScheduledAt: "${now}"
+
+  - name: SETTLE
+    description: Execute settlement; may succeed or fail (e.g. counterparty default).
+    fromState: PENDING_SETTLEMENT
+    trigger: EXTERNAL
+    type: JAVASCRIPT
+    outcomes:
+      - name: settled
+        toState: SETTLED
+      - name: failed
+        toState: FAILED
+    script: |
+      function execute(metadata) {
+        // In production this would call a settlement service that may fail.
+        var counterpartyOk = (metadata.counterparty || '').toLowerCase() !== 'defaulted';
+        if (counterpartyOk) {
+          metadata.settledAt = new Date().toISOString();
+          metadata.settledBy = metadata.settledBy || 'SYSTEM';
+          return { outcome: 'settled', metadata: metadata };
+        }
+        metadata.failureReason = 'counterparty defaulted at settlement';
+        metadata.failedAt      = new Date().toISOString();
+        return { outcome: 'failed', metadata: metadata };
+      }
+
+  - name: CANCEL
+    description: Cancel the trade before submission.
+    fromState: BOOKED
+    trigger: EXTERNAL
+    type: DECLARATIVE
+    outcomes:
+      - name: ok
+        toState: CANCELLED
+        set:
+          cancelledAt: "${now}"
+
+  - name: CANCEL_VALIDATED
+    description: Cancel a validated trade before it is scheduled.
+    fromState: VALIDATED
+    trigger: EXTERNAL
+    type: DECLARATIVE
+    outcomes:
+      - name: ok
+        toState: CANCELLED
+        set:
+          cancelledAt: "${now}"
+
+  - name: RESUBMIT
+    description: Correct and resubmit a failed trade.
+    fromState: FAILED
+    trigger: EXTERNAL
+    type: DECLARATIVE
+    outcomes:
+      - name: ok
+        toState: SUBMITTED
+        set:
+          submittedAt: "${now}"
+        unset:
+          - failureReason
+          - failedAt
+          - validatedAt

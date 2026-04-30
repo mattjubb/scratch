@@ -1,0 +1,364 @@
+openapi: "3.0.3"
+info:
+  title: Trade Workflow API
+  description: >
+    REST API for the Trade Workflow System. Manages workflow FSM definitions,
+    trade instances, and event triggering. Served at /api/.
+  version: "1.0.0"
+  contact:
+    name: Trade Workflow
+
+servers:
+  - url: http://localhost:8080/api
+    description: Local development server
+
+tags:
+  - name: workflows
+    description: Workflow definition management
+  - name: trades
+    description: Trade instance management and event triggering
+
+paths:
+
+  /workflows:
+    get:
+      tags: [workflows]
+      summary: List all workflows
+      operationId: listWorkflows
+      responses:
+        "200":
+          description: Array of workflow objects
+    post:
+      tags: [workflows]
+      summary: Create a new workflow
+      operationId: createWorkflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Workflow"
+      responses:
+        "201":
+          description: Created workflow
+
+  /workflows/import:
+    post:
+      tags: [workflows]
+      summary: Import a workflow from YAML text
+      operationId: importWorkflow
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+      responses:
+        "201":
+          description: Imported workflow
+
+  /workflows/{id}:
+    get:
+      tags: [workflows]
+      summary: Get workflow by ID
+      operationId: getWorkflow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Workflow }
+        "404": { description: Not found }
+    put:
+      tags: [workflows]
+      summary: Replace a workflow definition
+      operationId: updateWorkflow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Workflow"
+      responses:
+        "200": { description: Updated workflow }
+        "404": { description: Not found }
+    delete:
+      tags: [workflows]
+      summary: Delete a workflow
+      operationId: deleteWorkflow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Deleted }
+        "404": { description: Not found }
+
+  /workflows/{id}/export:
+    get:
+      tags: [workflows]
+      summary: Export workflow as YAML
+      operationId: exportWorkflow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: YAML text
+          content:
+            text/plain:
+              schema:
+                type: string
+        "404": { description: Not found }
+
+  /workflows/{id}/graph:
+    get:
+      tags: [workflows]
+      summary: Get graph data (nodes + edges) for vis.js rendering
+      operationId: getWorkflowGraph
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Graph nodes and edges
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodes:
+                    type: array
+                    items:
+                      type: object
+                  edges:
+                    type: array
+                    items:
+                      type: object
+
+  /trades:
+    get:
+      tags: [trades]
+      summary: List trades, optionally filtered by workflowId
+      operationId: listTrades
+      parameters:
+        - name: workflowId
+          in: query
+          schema: { type: string }
+      responses:
+        "200": { description: Array of trades }
+    post:
+      tags: [trades]
+      summary: Create a new trade instance
+      operationId: createTrade
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [workflowId]
+              properties:
+                workflowId:
+                  type: string
+                metadata:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "201": { description: Created trade }
+        "400": { description: Validation error }
+        "404": { description: Workflow not found }
+
+  /trades/{id}:
+    get:
+      tags: [trades]
+      summary: Get trade by ID
+      operationId: getTrade
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Trade }
+        "404": { description: Not found }
+    delete:
+      tags: [trades]
+      summary: Delete a trade
+      operationId: deleteTrade
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Deleted }
+        "404": { description: Not found }
+
+  /trades/{id}/state:
+    get:
+      tags: [trades]
+      summary: Get the current FSM state of a trade
+      operationId: getTradeState
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Current state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tradeId: { type: string }
+                  currentState: { type: string }
+
+  /trades/{id}/history:
+    get:
+      tags: [trades]
+      summary: Get the state-change history of a trade
+      operationId: getTradeHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Array of history entries }
+
+  /trades/{id}/events:
+    get:
+      tags: [trades]
+      summary: List EXTERNAL events available in the current state
+      operationId: getAvailableEvents
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Available event names
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tradeId: { type: string }
+                  events:
+                    type: array
+                    items: { type: string }
+
+  /trades/{id}/events/{eventName}:
+    post:
+      tags: [trades]
+      summary: Trigger a named EXTERNAL event on a trade
+      operationId: triggerEvent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: eventName
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        description: Optional params injected into declarative transitions as ${key}
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200": { description: Updated trade }
+        "400": { description: Event not available or is AUTO }
+        "404": { description: Trade not found }
+
+components:
+  schemas:
+
+    Workflow:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        initialState:
+          type: string
+        states:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowState"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowEvent"
+
+    WorkflowState:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        criteria:
+          type: object
+          additionalProperties: { type: string }
+        autoEvents:
+          type: array
+          items: { type: string }
+
+    WorkflowEvent:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        from:
+          type: string
+        to:
+          type: string
+        trigger:
+          type: string
+          enum: [EXTERNAL, AUTO]
+        transitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transition"
+
+    Transition:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [DECLARATIVE, SCRIPT]
+        set:
+          type: object
+          additionalProperties: { type: string }
+        unset:
+          type: array
+          items: { type: string }
+        language:
+          type: string
+          enum: [JAVASCRIPT, PYTHON]
+        script:
+          type: string
