@@ -1,0 +1,176 @@
+# ============================================================
+# Temporal REST Service Worker — OCP Infra
+# ============================================================
+# Deploy order:
+#   1. oc apply -f worker-ocp.yaml
+#   2. oc start-build temporal-rest-worker -n temporal --from-dir=. --follow
+#   3. oc rollout status deployment/temporal-rest-worker -n temporal
+#
+# To send stop signal from outside the cluster:
+#   oc exec -n temporal deploy/temporal-rest-worker -- \
+#     java -jar app.jar --stop
+# ============================================================
+
+---
+# ── ServiceAccount ────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: temporal-rest-worker
+  namespace: temporal
+automountServiceAccountToken: true   # Fabric8 needs this to call OCP API
+
+---
+# ── ClusterRole: manage the rest-service namespace and its resources ──────────
+# Scoped to only what the worker actually needs
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: temporal-rest-worker
+rules:
+  # Namespace lifecycle
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "create", "delete"]
+  # Core resources inside rest-service namespace
+  - apiGroups: [""]
+    resources: ["configmaps", "services"]
+    verbs: ["get", "list", "create", "delete"]
+  # Deployments
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "create", "delete", "watch"]
+  # OCP Routes
+  - apiGroups: ["route.openshift.io"]
+    resources: ["routes"]
+    verbs: ["get", "list", "create", "delete"]
+
+---
+# ── ClusterRoleBinding ────────────────────────────────────────────────────────
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: temporal-rest-worker
+subjects:
+  - kind: ServiceAccount
+    name: temporal-rest-worker
+    namespace: temporal
+roleRef:
+  kind: ClusterRole
+  name: temporal-rest-worker
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ── ImageStream (CRC internal registry) ──────────────────────────────────────
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: temporal-rest-worker
+  namespace: temporal
+spec:
+  lookupPolicy:
+    local: true
+
+---
+# ── BuildConfig — builds the worker image from local source ──────────────────
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: temporal-rest-worker
+  namespace: temporal
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: temporal-rest-worker:latest
+
+---
+# ── Worker Deployment ─────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal-rest-worker
+  namespace: temporal
+  labels:
+    app: temporal-rest-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: temporal-rest-worker
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: temporal-rest-worker
+    spec:
+      serviceAccountName: temporal-rest-worker
+      automountServiceAccountToken: true
+
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: worker
+          # References the ImageStream built above
+          image: temporal-rest-worker:latest
+          imagePullPolicy: Always
+
+          env:
+            # In-cluster Temporal frontend service DNS
+            - name: TEMPORAL_HOST
+              value: "temporal-frontend.temporal.svc.cluster.local:7233"
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "ps aux | grep java | grep -v grep"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+
+      volumes:
+        - name: tmp
+          emptyDir: {}
+
+---
+# ── NetworkPolicy — worker can reach Temporal frontend ───────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: temporal-rest-worker-egress
+  namespace: temporal
+spec:
+  podSelector:
+    matchLabels:
+      app: temporal-rest-worker
+  policyTypes:
+    - Egress
+  egress:
+    - {}   # Allow all egress — worker needs to reach Temporal + OCP API

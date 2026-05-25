@@ -1,0 +1,581 @@
+# ============================================================
+# Temporal Server + UI — OpenShift Container Platform
+# auto-setup:1.29.4 with correct config_template.yaml
+# Uses POSTGRES_SEEDS / POSTGRES_USER / POSTGRES_PWD env vars
+# which auto-setup substitutes into config_template.yaml
+# ============================================================
+# Replace <CLUSTER_DOMAIN> before applying:
+#   oc whoami --show-console
+#   strip "https://console-openshift-console." prefix
+# ============================================================
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: temporal-sa
+  namespace: temporal
+automountServiceAccountToken: false
+
+---
+# config_template.yaml uses the env var names that auto-setup
+# substitutes at startup via envsubst before writing docker.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: temporal-config
+  namespace: temporal
+data:
+  config_template.yaml: |
+    log:
+      stdout: true
+      level: "{{ default .Env.LOG_LEVEL "info" }}"
+
+    persistence:
+      defaultStore: default
+      visibilityStore: visibility
+      numHistoryShards: {{ default .Env.NUM_HISTORY_SHARDS "512" }}
+      datastores:
+        default:
+          sql:
+            pluginName: "postgres12"
+            databaseName: "{{ default .Env.DBNAME "temporal" }}"
+            connectAddr: "{{ .Env.POSTGRES_SEEDS }}:{{ default .Env.DB_PORT "5432" }}"
+            connectProtocol: "tcp"
+            user: "{{ .Env.POSTGRES_USER }}"
+            password: "{{ .Env.POSTGRES_PWD }}"
+            maxConns: 20
+            maxIdleConns: 20
+            maxConnLifetime: "1h"
+            tls:
+              enabled: false
+        visibility:
+          sql:
+            pluginName: "postgres12"
+            databaseName: "{{ default .Env.VISIBILITY_DBNAME "temporal_visibility" }}"
+            connectAddr: "{{ .Env.POSTGRES_SEEDS }}:{{ default .Env.DB_PORT "5432" }}"
+            connectProtocol: "tcp"
+            user: "{{ .Env.POSTGRES_USER }}"
+            password: "{{ .Env.POSTGRES_PWD }}"
+            maxConns: 10
+            maxIdleConns: 10
+            maxConnLifetime: "1h"
+            tls:
+              enabled: false
+
+    global:
+      membership:
+        maxJoinDuration: 30s
+        broadcastAddress: "{{ .Env.POD_IP }}"
+      pprof:
+        port: 7936
+      metrics:
+        prometheus:
+          framework: "tally"
+          listenAddress: "0.0.0.0:9090"
+
+    services:
+      frontend:
+        rpc:
+          grpcPort: 7233
+          membershipPort: 6933
+          bindOnIP: "0.0.0.0"
+      matching:
+        rpc:
+          grpcPort: 7235
+          membershipPort: 6935
+          bindOnIP: "0.0.0.0"
+      history:
+        rpc:
+          grpcPort: 7234
+          membershipPort: 6934
+          bindOnIP: "0.0.0.0"
+      worker:
+        rpc:
+          grpcPort: 7239
+          membershipPort: 6939
+          bindOnIP: "0.0.0.0"
+
+    clusterMetadata:
+      enableGlobalNamespace: false
+      failoverVersionIncrement: 10
+      masterClusterName: "active"
+      currentClusterName: "active"
+      clusterInformation:
+        active:
+          enabled: true
+          initialFailoverVersion: 1
+          rpcName: "frontend"
+          rpcAddress: "127.0.0.1:7233"
+
+    dcRedirectionPolicy:
+      policy: "noop"
+
+    archival:
+      history:
+        state: "disabled"
+      visibility:
+        state: "disabled"
+
+    publicClient:
+      hostPort: "temporal-frontend:7233"
+
+    namespaceDefaults:
+      archival:
+        history:
+          state: "disabled"
+        visibility:
+          state: "disabled"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal-frontend
+  namespace: temporal
+  labels:
+    app: temporal
+    component: frontend
+spec:
+  selector:
+    app: temporal
+    component: frontend
+  ports:
+    - name: grpc
+      port: 7233
+      targetPort: 7233
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal-membership
+  namespace: temporal
+  labels:
+    app: temporal
+spec:
+  clusterIP: None
+  selector:
+    app: temporal
+  ports:
+    - name: frontend-membership
+      port: 6933
+    - name: history-membership
+      port: 6934
+    - name: matching-membership
+      port: 6935
+    - name: worker-membership
+      port: 6939
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal-ui
+  namespace: temporal
+  labels:
+    app: temporal
+    component: ui
+spec:
+  selector:
+    app: temporal
+    component: ui
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal-server
+  namespace: temporal
+  labels:
+    app: temporal
+    component: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: temporal
+      component: frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: temporal
+        component: frontend
+    spec:
+      serviceAccountName: temporal-sa
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for postgres:5432..."
+              until nc -z postgres 5432; do sleep 3; done
+              echo "Postgres is up."
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+
+        - name: schema-setup
+          image: temporalio/admin-tools:1.29.4
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              echo "==> temporal schema"
+              temporal-sql-tool \
+                --plugin postgres12 --ep postgres -p 5432 \
+                -u "${DB_USER}" --pw "${DB_PASSWORD}" \
+                --db temporal setup-schema -v 0.0 || true
+              temporal-sql-tool \
+                --plugin postgres12 --ep postgres -p 5432 \
+                -u "${DB_USER}" --pw "${DB_PASSWORD}" \
+                --db temporal update-schema \
+                -d /etc/temporal/schema/postgresql/v12/temporal/versioned
+
+              echo "==> temporal_visibility schema"
+              temporal-sql-tool \
+                --plugin postgres12 --ep postgres -p 5432 \
+                -u "${DB_USER}" --pw "${DB_PASSWORD}" \
+                --db temporal_visibility setup-schema -v 0.0 || true
+              temporal-sql-tool \
+                --plugin postgres12 --ep postgres -p 5432 \
+                -u "${DB_USER}" --pw "${DB_PASSWORD}" \
+                --db temporal_visibility update-schema \
+                -d /etc/temporal/schema/postgresql/v12/visibility/versioned
+              echo "==> Done"
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: TEMPORAL_DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: TEMPORAL_DB_PASSWORD
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+
+      containers:
+        - name: temporal
+          image: temporalio/auto-setup:1.29.4
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: grpc-frontend
+              containerPort: 7233
+            - name: metrics
+              containerPort: 9090
+            - name: pprof
+              containerPort: 7936
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: DB
+              value: "postgres12"
+            - name: POSTGRES_SEEDS
+              value: "postgres"
+            - name: DB_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: TEMPORAL_DB_USER
+            - name: POSTGRES_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: TEMPORAL_DB_PASSWORD
+            - name: DBNAME
+              value: "temporal"
+            - name: VISIBILITY_DBNAME
+              value: "temporal_visibility"
+            - name: SERVICES
+              value: "frontend,history,matching,worker"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: SKIP_SCHEMA_SETUP
+              value: "true"
+            - name: NUM_HISTORY_SHARDS
+              value: "512"
+            - name: TEMPORAL_BROADCAST_ADDRESS
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          volumeMounts:
+            - name: temporal-config
+              mountPath: /etc/temporal/config
+            - name: config-template
+              mountPath: /etc/temporal/config/config_template.yaml
+              subPath: config_template.yaml
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            grpc:
+              port: 7233
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 4
+          readinessProbe:
+            grpc:
+              port: 7233
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+
+      volumes:
+        - name: temporal-config
+          emptyDir: {}
+        - name: config-template
+          configMap:
+            name: temporal-config
+        - name: tmp
+          emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal-ui
+  namespace: temporal
+  labels:
+    app: temporal
+    component: ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: temporal
+      component: ui
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: temporal
+        component: ui
+    spec:
+      serviceAccountName: temporal-sa
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+
+      initContainers:
+        - name: wait-for-temporal
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for temporal-frontend:7233..."
+              until nc -z temporal-frontend 7233; do sleep 3; done
+              echo "Temporal frontend is up."
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+
+      containers:
+        - name: temporal-ui
+          image: temporalio/ui:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: TEMPORAL_ADDRESS
+              value: "temporal-frontend:7233"
+            - name: TEMPORAL_UI_PORT
+              value: "8080"
+            - name: TEMPORAL_CORS_ORIGINS
+              value: "https://temporal-ui-temporal.<CLUSTER_DOMAIN>"
+            - name: TEMPORAL_PERMIT_WRITE_API
+              value: "true"
+            - name: TEMPORAL_DEFAULT_NAMESPACE
+              value: "default"
+            - name: TEMPORAL_TLS_SERVER_NAME
+              value: ""
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: ui-config
+              mountPath: /etc/temporal/config
+
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: ui-config
+          emptyDir: {}
+
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: temporal-ui
+  namespace: temporal
+  labels:
+    app: temporal
+    component: ui
+spec:
+  host: temporal-ui-temporal.<CLUSTER_DOMAIN>
+  to:
+    kind: Service
+    name: temporal-ui
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: temporal-frontend-grpc
+  namespace: temporal
+  labels:
+    app: temporal
+    component: frontend
+spec:
+  host: temporal-grpc-temporal.<CLUSTER_DOMAIN>
+  to:
+    kind: Service
+    name: temporal-frontend
+    weight: 100
+  port:
+    targetPort: grpc
+  tls:
+    termination: passthrough
+  wildcardPolicy: None
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: temporal-allow-internal
+  namespace: temporal
+spec:
+  podSelector:
+    matchLabels:
+      app: temporal
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: temporal
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-ingress
+  egress:
+    - {}
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: temporal-server-pdb
+  namespace: temporal
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: temporal
+      component: frontend
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: temporal-ui-pdb
+  namespace: temporal
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: temporal
+      component: ui
