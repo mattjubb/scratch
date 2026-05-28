@@ -1,0 +1,29 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.example'
+version = '1.0'
+java.sourceCompatibility = JavaVersion.VERSION_21
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'io.temporal:temporal-sdk:1.25.0'
+    implementation 'ch.qos.logback:logback-classic:1.4.14'
+}
+
+def mainClassName = project.findProperty('mainClass') ?: 'com.example.mapreduce.worker.MapReduceWorker'
+
+application {
+    mainClass = mainClassName
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': mainClassName
+    }
+}

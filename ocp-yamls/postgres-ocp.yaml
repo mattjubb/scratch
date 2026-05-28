@@ -1,0 +1,282 @@
+# ============================================================
+# PostgreSQL for Temporal — OpenShift Container Platform
+# Dev/CRC-sized resource requests
+# ============================================================
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: temporal
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-sa
+  namespace: temporal
+automountServiceAccountToken: false
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: temporal
+type: Opaque
+stringData:
+  POSTGRES_USER: "postgres"
+  POSTGRES_PASSWORD: "<CHANGE_ME>"
+  TEMPORAL_DB_USER: "temporal"
+  TEMPORAL_DB_PASSWORD: "<CHANGE_ME>"
+  PGPASSWORD: "<CHANGE_ME>"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: temporal
+  labels:
+    app: postgres
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  # storageClassName: gp3-csi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: temporal
+data:
+  01-init-temporal.sql: |
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'temporal') THEN
+        CREATE ROLE temporal LOGIN PASSWORD 'TEMPORAL_DB_PASSWORD_PLACEHOLDER';
+      END IF;
+    END
+    $$;
+
+    CREATE DATABASE temporal
+      OWNER temporal
+      ENCODING 'UTF8'
+      LC_COLLATE 'en_US.UTF-8'
+      LC_CTYPE   'en_US.UTF-8'
+      TEMPLATE template0;
+
+    CREATE DATABASE temporal_visibility
+      OWNER temporal
+      ENCODING 'UTF8'
+      LC_COLLATE 'en_US.UTF-8'
+      LC_CTYPE   'en_US.UTF-8'
+      TEMPLATE template0;
+
+    GRANT ALL PRIVILEGES ON DATABASE temporal TO temporal;
+    GRANT ALL PRIVILEGES ON DATABASE temporal_visibility TO temporal;
+
+  02-extensions.sql: |
+    \c temporal
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    \c temporal_visibility
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: temporal
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      serviceAccountName: postgres-sa
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 26
+        fsGroup: 26
+        seccompProfile:
+          type: RuntimeDefault
+
+      initContainers:
+        - name: patch-init-sql
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              cp /init-readonly/01-init-temporal.sql /init-writable/01-init-temporal.sql
+              cp /init-readonly/02-extensions.sql     /init-writable/02-extensions.sql
+              sed -i "s|TEMPORAL_DB_PASSWORD_PLACEHOLDER|${TEMPORAL_DB_PASSWORD}|g" \
+                /init-writable/01-init-temporal.sql
+          env:
+            - name: TEMPORAL_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: TEMPORAL_DB_PASSWORD
+          volumeMounts:
+            - name: init-readonly
+              mountPath: /init-readonly
+            - name: init-writable
+              mountPath: /init-writable
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: "postgres"
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRES_MAX_CONNECTIONS
+              value: "100"
+            - name: POSTGRES_SHARED_BUFFERS
+              value: "64MB"
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            - name: init-writable
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /var/run/postgresql
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - PGPASSWORD=$POSTGRES_PASSWORD pg_isready -U $POSTGRES_USER -h 127.0.0.1 -p 5432
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 6
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - PGPASSWORD=$POSTGRES_PASSWORD pg_isready -U $POSTGRES_USER -h 127.0.0.1 -p 5432
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-data
+        - name: init-readonly
+          configMap:
+            name: postgres-init
+        - name: init-writable
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: temporal
+  labels:
+    app: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-allow-temporal
+  namespace: temporal
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: temporal
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgres-pdb
+  namespace: temporal
+spec:
+  maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: postgres
