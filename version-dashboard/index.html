@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full antialiased">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Version Stage Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: rgb(148 163 184 / 0.4); border-radius: 3px; }
+    .dark ::-webkit-scrollbar-thumb { background: rgb(71 85 105 / 0.6); }
+    .no-spin::-webkit-inner-spin-button,
+    .no-spin::-webkit-outer-spin-button { appearance: none; margin: 0; }
+    .no-spin { -moz-appearance: textfield; }
+  </style>
+</head>
+<body
+  class="h-full bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
+  x-data="dashboard()"
+  x-cloak
+>
+  <div class="flex h-full min-h-screen">
+    <!-- Sidebar -->
+    <aside class="flex w-72 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+      <div class="border-b border-slate-200 px-4 py-5 dark:border-slate-800">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2.5">
+            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
+              <i data-lucide="layers" class="h-4 w-4"></i>
+            </div>
+            <div>
+              <h1 class="text-sm font-semibold tracking-tight">Stage Manager</h1>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Projects & versions</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            @click="toggleTheme()"
+            class="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            :title="theme === 'dark' ? 'Light mode' : 'Dark mode'"
+          >
+            <i data-lucide="sun" class="h-4 w-4 dark:hidden"></i>
+            <i data-lucide="moon" class="hidden h-4 w-4 dark:block"></i>
+          </button>
+        </div>
+        <div class="relative mt-4">
+          <i data-lucide="search" class="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400"></i>
+          <input
+            type="search"
+            x-model="query"
+            placeholder="Search projects…"
+            class="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none ring-indigo-500/0 transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:focus:border-indigo-500"
+          />
+        </div>
+      </div>
+
+      <nav class="flex-1 overflow-y-auto p-2">
+        <template x-for="p in filteredProjects" :key="p.id">
+          <button
+            type="button"
+            @click="selectProject(p.id)"
+            class="mb-1 flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition"
+            :class="selectedId === p.id
+              ? 'bg-indigo-50 text-indigo-900 ring-1 ring-inset ring-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-100 dark:ring-indigo-800'
+              : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60'"
+          >
+            <span
+              class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-xs font-semibold"
+              :class="selectedId === p.id
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'"
+              x-text="p.id.split('.').map(s => s[0]).join('').slice(0,2).toUpperCase()"
+            ></span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-sm font-medium" x-text="p.id"></span>
+              <span class="block truncate text-xs text-slate-500 dark:text-slate-400" x-text="p.name"></span>
+            </span>
+          </button>
+        </template>
+        <p x-show="loaded && !filteredProjects.length" class="px-3 py-6 text-center text-sm text-slate-500">No projects match.</p>
+      </nav>
+
+      <div class="space-y-1 border-t border-slate-200 p-2 dark:border-slate-800">
+        <button
+          type="button"
+          @click="addProject()"
+          class="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-600 transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-600 dark:text-slate-400 dark:hover:border-indigo-600 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-300"
+        >
+          <i data-lucide="plus" class="h-4 w-4"></i>
+          Add project
+        </button>
+        <div class="mt-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-800/50">
+          <i data-lucide="user" class="h-3.5 w-3.5 flex-shrink-0 text-slate-400"></i>
+          <input
+            type="text"
+            x-model="currentUser"
+            @input="saveUser()"
+            placeholder="Your name"
+            class="min-w-0 flex-1 bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400 dark:text-slate-300"
+          />
+        </div>
+        <div class="mt-1 flex gap-1">
+          <button type="button" @click="exportJson()" class="flex-1 rounded-lg px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" title="Export JSON">
+            <i data-lucide="download" class="mx-auto h-3.5 w-3.5"></i>
+          </button>
+          <button type="button" @click="resetToSeed()" class="flex-1 rounded-lg px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" title="Reset to seed">
+            <i data-lucide="rotate-ccw" class="mx-auto h-3.5 w-3.5"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex min-w-0 flex-1 flex-col">
+      <template x-if="selectedProject">
+        <div class="flex min-h-0 flex-1 flex-col">
+          <!-- Header -->
+          <header class="shrink-0 border-b border-slate-200 bg-white px-6 py-5 dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p class="text-xs font-medium uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Project</p>
+                <h2 class="mt-0.5 font-mono text-2xl font-semibold tracking-tight" x-text="selectedProject.id"></h2>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400" x-text="selectedProject.name"></p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <a
+                  :href="selectedProject.githubRepo"
+                  target="_blank"
+                  rel="noopener"
+                  x-show="selectedProject.githubRepo"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+                >
+                  <i data-lucide="external-link" class="h-4 w-4"></i>
+                  Repository
+                </a>
+                <button
+                  type="button"
+                  @click="deleteProject(selectedProject.id)"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-600 transition hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/40"
+                >
+                  <i data-lucide="trash-2" class="h-4 w-4"></i>
+                  Delete
+                </button>
+              </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="mt-5 flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800" role="tablist">
+              <template x-for="tab in [
+                { id: 'description', label: 'Description', icon: 'file-text' },
+                { id: 'versions', label: 'Versions', icon: 'git-branch' },
+                { id: 'dependencies', label: 'Dependencies', icon: 'package' },
+                { id: 'lanes', label: 'Lanes', icon: 'server' }
+              ]" :key="tab.id">
+                <button
+                  type="button"
+                  role="tab"
+                  :aria-selected="activeTab === tab.id"
+                  @click="setTab(tab.id)"
+                  class="flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition sm:flex-none"
+                  :class="activeTab === tab.id
+                    ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'"
+                >
+                  <i :data-lucide="tab.icon" class="h-4 w-4"></i>
+                  <span x-text="tab.label"></span>
+                </button>
+              </template>
+            </div>
+          </header>
+
+          <div class="flex-1 overflow-y-auto p-6">
+            <!-- Description tab -->
+            <section x-show="activeTab === 'description'" class="mx-auto max-w-3xl space-y-8">
+              <div>
+                <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">Description</label>
+                <textarea
+                  x-model="selectedProject.description"
+                  rows="4"
+                  class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900"
+                  placeholder="What does this project do?"
+                ></textarea>
+              </div>
+
+              <div>
+                <div class="mb-3 flex items-center justify-between">
+                  <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500">Lead developers</h3>
+                  <button type="button" @click="addLeadDev(selectedProject)" class="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">+ Add</button>
+                </div>
+                <ul class="space-y-2">
+                  <template x-for="(dev, idx) in selectedProject.leadDevelopers" :key="idx">
+                    <li class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                      <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300" x-text="initials(dev.name)"></span>
+                      <input x-model="dev.name" placeholder="Name" class="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800" />
+                      <input x-model="dev.email" placeholder="Email" class="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800" />
+                      <button type="button" @click="removeLeadDev(selectedProject, idx)" class="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30">
+                        <i data-lucide="x" class="h-4 w-4"></i>
+                      </button>
+                    </li>
+                  </template>
+                </ul>
+              </div>
+
+              <div>
+                <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">GitHub repository</label>
+                <input x-model="selectedProject.githubRepo" type="url" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-mono text-sm dark:border-slate-700 dark:bg-slate-900" placeholder="https://github.com/org/repo" />
+              </div>
+
+              <div>
+                <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">Image tag</label>
+                <input x-model="selectedProject.imageTag" type="text" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-mono text-sm dark:border-slate-700 dark:bg-slate-900" placeholder="registry.example.com/my-service" />
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Repository portion of the container image. Each stage stores its own image version under <span class="font-mono">{tag}:{version}</span>.
+                </p>
+              </div>
+
+              <div>
+                <div class="mb-3 flex items-center justify-between">
+                  <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-500">Artifacts</h3>
+                  <button type="button" @click="addArtifact(selectedProject)" class="text-xs font-medium text-indigo-600 dark:text-indigo-400">+ Add</button>
+                </div>
+                <ul class="space-y-2">
+                  <template x-for="(art, idx) in selectedProject.artifacts" :key="idx">
+                    <li class="flex gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                      <input x-model="art.name" placeholder="Artifact name" class="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800" />
+                      <input x-model="art.url" placeholder="URL" class="flex-[2] rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-sm dark:border-slate-600 dark:bg-slate-800" />
+                      <button type="button" @click="removeArtifact(selectedProject, idx)" class="rounded-lg p-2 text-slate-400 hover:text-red-600"><i data-lucide="x" class="h-4 w-4"></i></button>
+                    </li>
+                  </template>
+                </ul>
+              </div>
+
+              <div>
+                <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Dependency projects</h3>
+                <div class="flex flex-wrap gap-2">
+                  <template x-for="depId in selectedProject.dependencies" :key="depId">
+                    <button
+                      type="button"
+                      @click="selectProject(depId); setTab('versions')"
+                      class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-mono transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-slate-600 dark:bg-slate-800 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/40"
+                    >
+                      <i data-lucide="link" class="h-3.5 w-3.5 text-indigo-500"></i>
+                      <span x-text="depId"></span>
+                    </button>
+                  </template>
+                  <span x-show="!selectedProject.dependencies.length" class="text-sm text-slate-500">No dependencies — manage them in the Dependencies tab.</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Versions tab -->
+            <section x-show="activeTab === 'versions'" class="space-y-6">
+              <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Versions live on two axes: <strong class="text-slate-800 dark:text-slate-200">lane</strong> (snapshot → candidate → release) and
+                  <strong class="text-slate-800 dark:text-slate-200">iteration</strong> (next → current → previous).
+                  Together they form a <strong class="text-slate-800 dark:text-slate-200">stage</strong>. Promote moves versions forward; rebase syncs dependency pins to each dependency’s version at the same stage.
+                </p>
+              </div>
+
+              <!-- Stage grid -->
+              <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+                <table class="w-full min-w-[720px] border-collapse text-sm">
+                  <thead>
+                    <tr class="border-b border-slate-200 dark:border-slate-700">
+                      <th class="w-28 bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/50">Lane</th>
+                      <template x-for="iter in ITERATIONS" :key="iter">
+                        <th class="bg-slate-50 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/50" x-text="iter"></th>
+                      </template>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="lane in LANES" :key="lane">
+                      <tr class="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                        <td class="px-4 py-4 align-top">
+                          <span
+                            class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold capitalize ring-1 ring-inset"
+                            :class="[laneColor(lane).bg, laneColor(lane).text, laneColor(lane).ring]"
+                          >
+                            <span class="h-2 w-2 rounded-full" :class="laneColor(lane).dot"></span>
+                            <span x-text="lane"></span>
+                          </span>
+                        </td>
+                        <template x-for="iter in ITERATIONS" :key="iter">
+                          <td class="p-3 align-top" x-data="{ stageKey: lane + '-' + iter, unlocked: false }">
+                            <div
+                              class="rounded-xl border p-3 transition"
+                              :class="iter === 'current'
+                                ? 'border-indigo-200 bg-indigo-50/50 ring-1 ring-indigo-200/60 dark:border-indigo-800 dark:bg-indigo-950/30 dark:ring-indigo-800/60'
+                                : 'border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/30'"
+                            >
+                              <div class="mb-2 flex items-center justify-between">
+                                <p class="font-mono text-[10px] uppercase tracking-wide text-slate-400" x-text="stageKey"></p>
+                                <button
+                                  type="button"
+                                  @click="unlocked = !unlocked"
+                                  :title="unlocked ? 'Lock fields' : 'Unlock to edit'"
+                                  :class="unlocked ? 'text-amber-500 hover:text-amber-600' : 'text-slate-300 hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400'"
+                                  class="rounded p-0.5 transition-colors"
+                                >
+                                  <span x-show="!unlocked"><i data-lucide="lock" class="h-3.5 w-3.5"></i></span>
+                                  <span x-show="unlocked"><i data-lucide="lock-open" class="h-3.5 w-3.5"></i></span>
+                                </button>
+                              </div>
+                              <label class="block">
+                                <span class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Artifact version</span>
+                                <input
+                                  type="text"
+                                  x-model="selectedProject.stages[stageKey].version"
+                                  @input="touchStage(selectedProject.id, stageKey)"
+                                  :readonly="!unlocked"
+                                  :tabindex="unlocked ? 0 : -1"
+                                  :class="unlocked
+                                    ? 'bg-white dark:bg-slate-900 cursor-text'
+                                    : 'bg-slate-50 dark:bg-slate-800/60 cursor-default text-slate-500 dark:text-slate-400 select-none pointer-events-none'"
+                                  class="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1 font-mono text-sm transition-colors dark:border-slate-600"
+                                />
+                              </label>
+                              <label class="mt-1.5 block">
+                                <span class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Image version</span>
+                                <input
+                                  type="text"
+                                  x-model="selectedProject.stages[stageKey].imageVersion"
+                                  @input="touchStage(selectedProject.id, stageKey)"
+                                  placeholder="1.2.0"
+                                  :readonly="!unlocked"
+                                  :tabindex="unlocked ? 0 : -1"
+                                  :class="unlocked
+                                    ? 'bg-white dark:bg-slate-900 cursor-text'
+                                    : 'bg-slate-50 dark:bg-slate-800/60 cursor-default text-slate-500 dark:text-slate-400 select-none pointer-events-none'"
+                                  class="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1 font-mono text-sm transition-colors dark:border-slate-600"
+                                />
+                              </label>
+                              <div class="mt-2 mb-1.5 flex items-center gap-2">
+                                <!-- Timestamps -->
+                                <div class="min-w-0 flex-1 space-y-0.5">
+                                  <div class="flex items-center gap-1.5 text-[10px] text-slate-400">
+                                    <i data-lucide="clock" class="h-3 w-3 flex-shrink-0"></i>
+                                    <span class="truncate" x-text="formatDate(selectedProject.stages[stageKey].lastUpdated)"></span>
+                                  </div>
+                                  <div class="flex items-center gap-1.5 text-[10px] text-slate-400">
+                                    <i data-lucide="user" class="h-3 w-3 flex-shrink-0"></i>
+                                    <span class="truncate" x-text="selectedProject.stages[stageKey].lastUpdatedBy || '—'"></span>
+                                  </div>
+                                </div>
+                                <!-- Test pass rate: plain label + donut -->
+                                <div class="flex flex-shrink-0 items-center gap-1.5">
+                                  <div class="flex items-baseline gap-0.5 font-mono text-[10px] text-slate-500 dark:text-slate-400">
+                                    <input type="number" min="0"
+                                      x-model.number="selectedProject.stages[stageKey].testsPassed"
+                                      @input="touchStage(selectedProject.id, stageKey)"
+                                      :readonly="!unlocked"
+                                      :tabindex="unlocked ? 0 : -1"
+                                      :class="unlocked ? 'cursor-text' : 'pointer-events-none cursor-default'"
+                                      class="no-spin w-6 bg-transparent text-right outline-none"
+                                    />
+                                    <span class="text-slate-400">/</span>
+                                    <input type="number" min="0"
+                                      x-model.number="selectedProject.stages[stageKey].testsTotal"
+                                      @input="touchStage(selectedProject.id, stageKey)"
+                                      :readonly="!unlocked"
+                                      :tabindex="unlocked ? 0 : -1"
+                                      :class="unlocked ? 'cursor-text' : 'pointer-events-none cursor-default'"
+                                      class="no-spin w-6 bg-transparent outline-none"
+                                    />
+                                  </div>
+                                  <div class="h-9 w-9 flex-shrink-0">
+                                    <svg width="36" height="36" viewBox="0 0 36 36">
+                                      <circle cx="18" cy="18" r="13" fill="none" stroke="currentColor" stroke-width="4" class="text-slate-200 dark:text-slate-700" />
+                                      <circle cx="18" cy="18" r="13" fill="none" stroke-width="4"
+                                        stroke-linecap="round"
+                                        transform="rotate(-90 18 18)"
+                                        :stroke="testPassColor(stageKey)"
+                                        :stroke-dasharray="testDash(stageKey)"
+                                      />
+                                    </svg>
+                                  </div>
+                                </div>
+                              </div>
+                              <div class="flex flex-wrap gap-1">
+                                <button
+                                  type="button"
+                                  x-show="canPromote(stageKey)"
+                                  @click="promote(selectedProject.id, stageKey)"
+                                  :class="stageKey === 'release-next'
+                                    ? 'bg-emerald-500 hover:bg-emerald-400 ring-1 ring-emerald-300 shadow shadow-emerald-200/60 dark:ring-emerald-600 dark:shadow-none'
+                                    : 'bg-indigo-600 hover:bg-indigo-700'"
+                                  class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-white"
+                                >
+                                  <i x-show="stageKey === 'release-next'" data-lucide="rocket" class="h-3 w-3"></i>
+                                  <i x-show="stageKey !== 'release-next'" data-lucide="arrow-up-right" class="h-3 w-3"></i>
+                                  <span x-text="promoteLabel(stageKey)"></span>
+                                </button>
+                                <button
+                                  type="button"
+                                  x-show="selectedProject.dependencies.length && !stageKey.endsWith('-previous') && stageKey !== 'release-current'"
+                                  @click="rebase(selectedProject.id, stageKey)"
+                                  class="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                                  title="Refresh dependency pins from each dependency's version at this stage"
+                                >
+                                  <i data-lucide="refresh-cw" class="h-3 w-3"></i>
+                                  Rebase
+                                </button>
+                                <button
+                                  type="button"
+                                  x-show="!stageKey.endsWith('-previous') && stageKey !== 'release-current'"
+                                  @click="openChanges(stageKey)"
+                                  title="View PRs merged into this version"
+                                  class="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                                >
+                                  <i data-lucide="git-pull-request" class="h-3 w-3"></i>
+                                  <span>Changes</span>
+                                  <span
+                                    x-show="(selectedProject.stages[stageKey]?.prs?.length || 0) > 0"
+                                    class="ml-0.5 rounded-full bg-slate-200 px-1.5 py-0 text-[10px] text-slate-700 dark:bg-slate-700 dark:text-slate-200"
+                                    x-text="selectedProject.stages[stageKey]?.prs?.length || 0"
+                                  ></span>
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </template>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Promotion flow legend -->
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                  <h4 class="mb-2 flex items-center gap-2 text-sm font-semibold">
+                    <i data-lucide="arrow-right" class="h-4 w-4 text-indigo-500"></i>
+                    Within a lane
+                  </h4>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">
+                    <span class="font-mono text-xs">snapshot-next</span> → current (previous shifts down) after tests pass and a lead promotes.
+                  </p>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                  <h4 class="mb-2 flex items-center gap-2 text-sm font-semibold">
+                    <i data-lucide="arrow-up" class="h-4 w-4 text-indigo-500"></i>
+                    Across lanes
+                  </h4>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">
+                    <span class="font-mono text-xs">snapshot-current</span> → <span class="font-mono text-xs">candidate-next</span> when ready for the next maturity lane.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <!-- Dependencies tab -->
+            <section x-show="activeTab === 'dependencies'" class="mx-auto max-w-4xl space-y-6">
+              <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Each stage pins versions of upstream projects. On promote, pins copy matching stage versions from dependencies; use <strong>Rebase</strong> on the Versions tab to refresh without promoting.
+                </p>
+              </div>
+
+              <div class="flex flex-wrap gap-2">
+                <select
+                  x-model="addDepInput"
+                  class="min-w-[200px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                >
+                  <option value="">Add dependency…</option>
+                  <template x-for="id in availableDeps(selectedProject)" :key="id">
+                    <option :value="id" x-text="id"></option>
+                  </template>
+                </select>
+                <button
+                  type="button"
+                  @click="addDependency(selectedProject, addDepInput)"
+                  class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                >
+                  Add
+                </button>
+                <button
+                  type="button"
+                  x-show="selectedProject.dependencies.length"
+                  @click="rebaseAll(selectedProject.id); refreshIcons()"
+                  title="Rebase every dependency at every stage to its upstream value"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+                  Rebase all
+                </button>
+              </div>
+
+              <template x-for="depId in selectedProject.dependencies" :key="depId">
+                <article class="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+                  <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+                    <div class="flex items-center gap-3">
+                      <button type="button" @click="selectProject(depId)" class="font-mono text-sm font-semibold text-indigo-600 hover:underline dark:text-indigo-400" x-text="depId"></button>
+                      <span class="text-xs text-slate-500" x-text="projects.find(p => p.id === depId)?.name || ''"></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <button
+                        type="button"
+                        @click="rebaseDep(selectedProject.id, depId); refreshIcons()"
+                        title="Rebase this dependency across all 9 stages"
+                        class="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+                      >
+                        <i data-lucide="refresh-cw" class="h-3 w-3"></i>
+                        Rebase all stages
+                      </button>
+                      <button type="button" @click="removeDependency(selectedProject, depId)" class="text-xs text-red-600 hover:underline dark:text-red-400">Remove</button>
+                    </div>
+                  </div>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                      <thead>
+                        <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-500 dark:border-slate-800">
+                          <th class="px-4 py-2">Stage</th>
+                          <th class="px-4 py-2">Pinned (this project)</th>
+                          <th class="px-4 py-2">Upstream at stage</th>
+                          <th class="px-4 py-2">Status</th>
+                          <th class="px-4 py-2 text-right"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="sk in STAGE_KEYS" :key="sk">
+                          <tr class="border-b border-slate-50 last:border-0 dark:border-slate-800/80">
+                            <td class="px-4 py-2 font-mono text-xs text-slate-500" x-text="sk"></td>
+                            <td class="px-4 py-2 font-mono text-xs">
+                              <div class="flex items-center gap-1.5">
+                                <span class="text-[9px] font-semibold not-italic uppercase tracking-wider text-slate-400">artifact</span>
+                                <span :class="depDriftFields(selectedProject.id, sk, depId).version ? 'text-amber-700 dark:text-amber-400' : ''" x-text="selectedProject.stages[sk]?.deps?.[depId]?.version || '—'"></span>
+                              </div>
+                              <div class="flex items-center gap-1.5">
+                                <span class="text-[9px] font-semibold not-italic uppercase tracking-wider text-slate-400">image</span>
+                                <span :class="depDriftFields(selectedProject.id, sk, depId).image ? 'text-amber-700 dark:text-amber-400' : ''" x-text="selectedProject.stages[sk]?.deps?.[depId]?.imageVersion || '—'"></span>
+                              </div>
+                            </td>
+                            <td class="px-4 py-2 font-mono text-xs">
+                              <div class="flex items-center gap-1.5">
+                                <span class="text-[9px] font-semibold not-italic uppercase tracking-wider text-slate-400">artifact</span>
+                                <span x-text="projects.find(p => p.id === depId)?.stages[sk]?.version || '—'"></span>
+                              </div>
+                              <div class="flex items-center gap-1.5">
+                                <span class="text-[9px] font-semibold not-italic uppercase tracking-wider text-slate-400">image</span>
+                                <span class="text-slate-400" x-text="projects.find(p => p.id === depId)?.stages[sk]?.imageVersion || '—'"></span>
+                              </div>
+                            </td>
+                            <td class="px-4 py-2">
+                              <span
+                                x-show="depDrift(selectedProject.id, sk, depId)"
+                                class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
+                              >
+                                <i data-lucide="alert-triangle" class="h-3 w-3"></i>
+                                Drift
+                              </span>
+                              <span
+                                x-show="!depDrift(selectedProject.id, sk, depId) && selectedProject.stages[sk]?.deps?.[depId]"
+                                class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+                              >
+                                <i data-lucide="check" class="h-3 w-3"></i>
+                                In sync
+                              </span>
+                            </td>
+                            <td class="px-4 py-2 text-right">
+                              <button
+                                type="button"
+                                x-show="depDrift(selectedProject.id, sk, depId)"
+                                @click="rebaseCell(selectedProject.id, sk, depId); refreshIcons()"
+                                title="Rebase just this stage's pin for this dependency"
+                                class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+                              >
+                                <i data-lucide="refresh-cw" class="h-3 w-3"></i>
+                                Rebase
+                              </button>
+                            </td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                </article>
+              </template>
+
+              <p x-show="!selectedProject.dependencies.length" class="text-center text-sm text-slate-500 py-8">No dependencies configured.</p>
+            </section>
+
+            <!-- Lanes tab -->
+            <section x-show="activeTab === 'lanes'" class="space-y-6">
+              <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Deployment lanes pin a named environment to a specific stage. Versions and dependencies in each lane reflect whatever currently lives at its target stage — promote that stage to roll the lane forward.
+                </p>
+              </div>
+
+              <div class="space-y-3">
+                <template x-for="lane in DEPLOY_LANES" :key="lane.id">
+                  <article
+                    class="rounded-xl border bg-white ring-1 transition dark:bg-slate-900"
+                    :class="[laneAccent(lane.accent).ring, 'border-slate-200 dark:border-slate-800']"
+                  >
+                    <div
+                      class="rounded-t-xl flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3"
+                      :class="[laneAccent(lane.accent).bg, 'border-slate-200/70 dark:border-slate-800']"
+                    >
+                      <div class="flex items-center gap-3">
+                        <span class="flex h-9 w-9 items-center justify-center rounded-lg text-white" :class="laneAccent(lane.accent).dot">
+                          <i data-lucide="server" class="h-4 w-4"></i>
+                        </span>
+                        <div>
+                          <h4 class="text-sm font-semibold leading-tight" x-text="lane.name"></h4>
+                          <p class="text-xs text-slate-500 dark:text-slate-400 leading-tight" x-text="lane.desc"></p>
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <div x-data="{ stageOpen: false }" class="relative">
+                          <button
+                            type="button"
+                            @click="stageOpen = !stageOpen"
+                            class="flex items-center gap-3 rounded-xl bg-white px-4 py-2 ring-2 ring-inset shadow-sm transition hover:shadow-md dark:bg-slate-800"
+                            :class="laneAccent(lane.accent).ring"
+                          >
+                            <i data-lucide="arrow-right" class="h-4 w-4 flex-shrink-0 text-slate-400"></i>
+                            <div class="text-left">
+                              <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400 leading-none mb-1">Stage</p>
+                              <span class="font-mono text-sm font-semibold text-slate-900 dark:text-white" x-text="laneStages[lane.id]"></span>
+                            </div>
+                            <i data-lucide="chevron-down" class="h-3.5 w-3.5 text-slate-400 transition-transform" :class="stageOpen ? 'rotate-180' : ''"></i>
+                          </button>
+                          <div
+                            x-show="stageOpen"
+                            x-transition:enter="transition ease-out duration-100"
+                            x-transition:enter-start="opacity-0 scale-95"
+                            x-transition:enter-end="opacity-100 scale-100"
+                            x-transition:leave="transition ease-in duration-75"
+                            x-transition:leave-start="opacity-100 scale-100"
+                            x-transition:leave-end="opacity-0 scale-95"
+                            @click.outside="stageOpen = false"
+                            class="absolute right-0 top-full z-30 mt-1.5 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+                            style="display:none"
+                          >
+                            <template x-for="sk in STAGE_KEYS" :key="sk">
+                              <button
+                                type="button"
+                                @click="
+                                  stageOpen = false;
+                                  if (sk !== laneStages[lane.id]) openLaneConfirm(lane.id, lane.name, laneStages[lane.id], sk);
+                                "
+                                :class="sk === laneStages[lane.id]
+                                  ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300'
+                                  : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'"
+                                class="flex w-full items-center justify-between px-3 py-2 font-mono text-xs"
+                              >
+                                <span x-text="sk"></span>
+                                <i x-show="sk === laneStages[lane.id]" data-lucide="check" class="h-3 w-3"></i>
+                              </button>
+                            </template>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="grid gap-0 sm:grid-cols-[1fr,1.5fr]">
+                      <div class="border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:border-b-0 sm:border-r">
+                        <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Artifact version</p>
+                        <p class="mt-0.5 font-mono text-sm font-semibold" x-text="selectedProject.stages[laneStages[lane.id]]?.version || '—'"></p>
+                        <p class="mt-2 text-[9px] font-semibold uppercase tracking-wider text-slate-400">Image version</p>
+                        <p class="mt-0.5 font-mono text-sm font-semibold" x-text="selectedProject.stages[laneStages[lane.id]]?.imageVersion || '—'"></p>
+                      </div>
+                      <div class="px-5 py-4">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Dependencies</p>
+                        <template x-if="!selectedProject.dependencies.length">
+                          <p class="mt-1 text-xs italic text-slate-400">No dependencies.</p>
+                        </template>
+                        <ul class="mt-1 space-y-1.5">
+                          <template x-for="depId in selectedProject.dependencies" :key="depId">
+                            <li class="flex items-start justify-between gap-3 text-xs">
+                              <span class="font-mono text-slate-500" x-text="depId"></span>
+                              <div class="text-right">
+                                <div class="flex items-center justify-end gap-1.5">
+                                  <span class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">artifact</span>
+                                  <span class="font-mono text-slate-700 dark:text-slate-300" x-text="selectedProject.stages[laneStages[lane.id]]?.deps?.[depId]?.version || '—'"></span>
+                                </div>
+                                <div class="flex items-center justify-end gap-1.5">
+                                  <span class="text-[9px] font-semibold uppercase tracking-wider text-slate-400">image</span>
+                                  <span class="font-mono text-slate-700 dark:text-slate-300" x-text="selectedProject.stages[laneStages[lane.id]]?.deps?.[depId]?.imageVersion || '—'"></span>
+                                </div>
+                              </div>
+                            </li>
+                          </template>
+                        </ul>
+                      </div>
+                    </div>
+                  </article>
+                </template>
+              </div>
+            </section>
+          </div>
+        </div>
+      </template>
+
+      <!-- Empty state -->
+      <div x-show="loaded && !selectedProject" class="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+        <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-200 dark:bg-slate-800">
+          <i data-lucide="folder-open" class="h-8 w-8 text-slate-400"></i>
+        </div>
+        <p class="text-slate-500">Select a project or add one to get started.</p>
+        <button type="button" @click="addProject()" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Add project</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- ─── CHANGES MODAL ──────────────────────────────────────── -->
+  <div
+    x-show="changesOpen"
+    x-transition.opacity
+    @keydown.escape.window="closeChanges()"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    role="dialog"
+    aria-modal="true"
+    style="display: none"
+  >
+    <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="closeChanges()"></div>
+    <div
+      x-show="changesOpen"
+      x-transition
+      class="relative z-10 w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+    >
+      <header class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+        <div>
+          <p class="text-xs font-medium uppercase tracking-wider text-slate-500" x-text="'Changes in ' + (changesStageKey || '')"></p>
+          <h3 class="mt-0.5 font-mono text-lg font-semibold" x-text="selectedProject ? selectedProject.stages[changesStageKey]?.version || '—' : '—'"></h3>
+          <p class="mt-1 text-xs text-slate-500" x-text="changesPrs.length + ' PR' + (changesPrs.length === 1 ? '' : 's') + ' merged into this version'"></p>
+        </div>
+        <button
+          type="button"
+          @click="closeChanges()"
+          class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        >
+          <i data-lucide="x" class="h-4 w-4"></i>
+        </button>
+      </header>
+
+      <div class="max-h-[60vh] overflow-y-auto">
+        <template x-if="changesPrs.length === 0">
+          <div class="px-5 py-10 text-center text-sm text-slate-500">No PRs recorded for this version.</div>
+        </template>
+        <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+          <template x-for="pr in changesPrs" :key="pr.number">
+            <li>
+              <a
+                :href="pr.url"
+                target="_blank"
+                rel="noopener"
+                class="flex items-start gap-3 px-5 py-3 transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
+              >
+                <span class="mt-0.5 font-mono text-sm font-semibold text-indigo-600 dark:text-indigo-400" x-text="'#' + pr.number"></span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-medium text-slate-900 dark:text-slate-100" x-text="pr.title"></span>
+                  <span class="mt-0.5 block font-mono text-xs text-slate-500" x-text="'@' + pr.author"></span>
+                </span>
+                <i data-lucide="external-link" class="mt-1 h-3.5 w-3.5 shrink-0 text-slate-400"></i>
+              </a>
+            </li>
+          </template>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lane stage change confirmation modal -->
+  <div
+    x-show="laneConfirmOpen"
+    x-transition.opacity
+    @keydown.escape.window="closeLaneConfirm()"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    role="dialog"
+    aria-modal="true"
+    style="display: none"
+  >
+    <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="closeLaneConfirm()"></div>
+    <div
+      x-show="laneConfirmOpen"
+      x-transition
+      class="relative z-10 w-full max-w-sm overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+    >
+      <header class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+        <div>
+          <p class="text-xs font-medium uppercase tracking-wider text-slate-500">Change stage</p>
+          <h3 class="mt-0.5 text-base font-semibold" x-text="laneConfirmData.laneName"></h3>
+        </div>
+        <button
+          type="button"
+          @click="closeLaneConfirm()"
+          class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        >
+          <i data-lucide="x" class="h-4 w-4"></i>
+        </button>
+      </header>
+      <div class="px-5 py-4">
+        <p class="text-sm text-slate-600 dark:text-slate-400">This lane will point to a different stage. Versions and dependency pins shown for this lane will change immediately.</p>
+        <div class="mt-4 flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 font-mono text-sm dark:bg-slate-800">
+          <span class="text-slate-500" x-text="laneConfirmData.from"></span>
+          <i data-lucide="arrow-right" class="h-4 w-4 shrink-0 text-slate-400"></i>
+          <span class="font-semibold text-slate-900 dark:text-white" x-text="laneConfirmData.to"></span>
+        </div>
+      </div>
+      <footer class="flex justify-end gap-2 border-t border-slate-200 px-5 py-3 dark:border-slate-700">
+        <button
+          type="button"
+          @click="closeLaneConfirm()"
+          class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          @click="confirmLaneChange(); refreshIcons()"
+          class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+        >
+          Confirm
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <script src="app.js?v=13"></script>
+</body>
+</html>

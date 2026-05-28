@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.vd.ProjectResourceTest" tests="20" skipped="0" failures="0" errors="0" timestamp="2026-05-23T02:51:57.596Z" hostname="Mac.localdomain" time="0.907">
+  <properties/>
+  <testcase name="listProjects_returnsSeedData()" classname="com.example.vd.ProjectResourceTest" time="0.624"/>
+  <testcase name="getProject_knownId_returnsProject()" classname="com.example.vd.ProjectResourceTest" time="0.023"/>
+  <testcase name="getProject_unknownId_returns404()" classname="com.example.vd.ProjectResourceTest" time="0.011"/>
+  <testcase name="listProjects_filterByQuery()" classname="com.example.vd.ProjectResourceTest" time="0.028"/>
+  <testcase name="createProject_validRequest_returns201()" classname="com.example.vd.ProjectResourceTest" time="0.02"/>
+  <testcase name="createProject_duplicateId_returns409()" classname="com.example.vd.ProjectResourceTest" time="0.005"/>
+  <testcase name="createProject_missingId_returns400()" classname="com.example.vd.ProjectResourceTest" time="0.005"/>
+  <testcase name="deleteProject_removesFromList()" classname="com.example.vd.ProjectResourceTest" time="0.008"/>
+  <testcase name="getAllStages_returns9Keys()" classname="com.example.vd.ProjectResourceTest" time="0.021"/>
+  <testcase name="getStage_knownStage_returnsData()" classname="com.example.vd.ProjectResourceTest" time="0.013"/>
+  <testcase name="patchStage_updatesFields()" classname="com.example.vd.ProjectResourceTest" time="0.017"/>
+  <testcase name="patchStage_invalidKey_returns400()" classname="com.example.vd.ProjectResourceTest" time="0.005"/>
+  <testcase name="promote_snapshotNext_shiftsSlots()" classname="com.example.vd.ProjectResourceTest" time="0.025"/>
+  <testcase name="promote_previousStage_returns400()" classname="com.example.vd.ProjectResourceTest" time="0.004"/>
+  <testcase name="promote_releaseCurrent_returns400()" classname="com.example.vd.ProjectResourceTest" time="0.004"/>
+  <testcase name="rebaseStage_updatesDeps()" classname="com.example.vd.ProjectResourceTest" time="0.008"/>
+  <testcase name="rebasePreviousStage_returns400()" classname="com.example.vd.ProjectResourceTest" time="0.004"/>
+  <testcase name="drift_returnsRecordPerDep()" classname="com.example.vd.ProjectResourceTest" time="0.012"/>
+  <testcase name="addAndRemovePr()" classname="com.example.vd.ProjectResourceTest" time="0.03"/>
+  <testcase name="addAndRemoveDependency()" classname="com.example.vd.ProjectResourceTest" time="0.027"/>
+  <system-out><![CDATA[2026-05-22 22:51:57,590 INFO  [io.quarkus] (Test worker) version-dashboard-api 1.0-SNAPSHOT on JVM (powered by Quarkus 3.10.1) started in 0.981s. Listening on: http://localhost:8081
+2026-05-22 22:51:57,592 INFO  [io.quarkus] (Test worker) Profile test activated. 
+2026-05-22 22:51:57,592 INFO  [io.quarkus] (Test worker) Installed features: [cdi, resteasy, resteasy-jackson, smallrye-context-propagation, smallrye-openapi, swagger-ui, vertx]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
