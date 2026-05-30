@@ -1,0 +1,676 @@
+{
+  "projects": [
+    {
+      "id": "core.datapedia",
+      "name": "Core Datapedia",
+      "description": "Central reference data service. Owns the canonical entity graph and exposes lookup, search, and bulk-export APIs for downstream pricing and analytics consumers.",
+      "leadDevelopers": [
+        {
+          "name": "Asha Patel",
+          "email": "asha.patel@example.com"
+        },
+        {
+          "name": "Diego Hernandez",
+          "email": "diego.h@example.com"
+        }
+      ],
+      "githubRepo": "https://github.com/example-org/core-datapedia",
+      "imageTag": "datapedia",
+      "artifacts": [
+        {
+          "name": "core-datapedia-api",
+          "url": "https://artifactory.example.com/core-datapedia-api"
+        },
+        {
+          "name": "core-datapedia-client",
+          "url": "https://artifactory.example.com/core-datapedia-client"
+        }
+      ],
+      "dependencies": [
+        "rates.pricer",
+        "data.analytics"
+      ],
+      "stages": {
+        "snapshot-previous": {
+          "version": "3.4.0-SNAPSHOT",
+          "imageVersion": "dev-2026.05.18-b4480",
+          "deps": {
+            "rates.pricer": {
+              "version": "2.7.0-SNAPSHOT",
+              "imageVersion": "dev-2026.05.18-b3120"
+            },
+            "data.analytics": {
+              "version": "1.12.0-SNAPSHOT",
+              "imageVersion": "dev-2026.05.18-b2014"
+            }
+          },
+          "prs": [
+            {
+              "number": 1881,
+              "title": "Add CUSIP fallback to entity resolver",
+              "author": "asha-patel",
+              "url": "https://github.com/example-org/core-datapedia/pull/1881"
+            },
+            {
+              "number": 1879,
+              "title": "Bump test-fixture corpus to 2026Q1",
+              "author": "diego-h",
+              "url": "https://github.com/example-org/core-datapedia/pull/1879"
+            }
+          ],
+          "testsPassed": 280,
+          "testsTotal": 400
+        },
+        "snapshot-current": {
+          "version": "3.4.1-SNAPSHOT",
+          "imageVersion": "dev-2026.05.20-b4501",
+          "deps": {
+            "rates.pricer": {
+              "version": "2.7.1-SNAPSHOT",
+              "imageVersion": "dev-2026.05.20-b3140"
+            },
+            "data.analytics": {
+              "version": "1.12.1-SNAPSHOT",
+              "imageVersion": "dev-2026.05.20-b2030"
+            }
+          },
+          "prs": [
+            {
+              "number": 1894,
+              "title": "Cache reference data writes behind a debounced batcher",
+              "author": "asha-patel",
+              "url": "https://github.com/example-org/core-datapedia/pull/1894"
+            },
+            {
+              "number": 1892,
+              "title": "Fix race in bulk export resumption",
+              "author": "diego-h",
+              "url": "https://github.com/example-org/core-datapedia/pull/1892"
+            },
+            {
+              "number": 1888,
+              "title": "Tighten search relevance for short tickers",
+              "author": "asha-patel",
+              "url": "https://github.com/example-org/core-datapedia/pull/1888"
+            }
+          ],
+          "testsPassed": 312,
+          "testsTotal": 400
+        },
+        "snapshot-next": {
+          "version": "3.4.2-SNAPSHOT",
+          "imageVersion": "dev-2026.05.21-b4517",
+          "deps": {
+            "rates.pricer": {
+              "version": "2.7.1-SNAPSHOT",
+              "imageVersion": "dev-2026.05.21-b3147"
+            },
+            "data.analytics": {
+              "version": "1.12.2-SNAPSHOT",
+              "imageVersion": "dev-2026.05.21-b2041"
+            }
+          },
+          "prs": [
+            {
+              "number": 1903,
+              "title": "Introduce streaming export endpoint",
+              "author": "asha-patel",
+              "url": "https://github.com/example-org/core-datapedia/pull/1903"
+            },
+            {
+              "number": 1901,
+              "title": "Refactor entity-graph traversal for cycle safety",
+              "author": "diego-h",
+              "url": "https://github.com/example-org/core-datapedia/pull/1901"
+            }
+          ],
+          "testsPassed": 187,
+          "testsTotal": 400
+        },
+        "candidate-previous": {
+          "version": "3.3.0-RC2",
+          "imageVersion": "rc-2026.04.30-b4220",
+          "deps": {
+            "rates.pricer": {
+              "version": "2.6.0-RC3",
+              "imageVersion": "rc-2026.04.30-b2980"
+            },
+            "data.analytics": {
+              "version": "1.11.0-RC1",
+              "imageVersion": "rc-2026.04.30-b1980"
+            }
+          },
+          "prs": [
+            {
+              "number": 1812,
+              "title": "Stabilize hot path for top-K search",
+              "author": "diego-h",
+              "url": "https://github.com/example-org/core-datapedia/pull/1812"
+            }
+          ],
+          "testsPassed": 366,
+          "testsTotal": 400
+        },
+        "candidate-current": {
+          "version": "3.3.1-RC1",
+          "imageVersion": "rc-2026.05.10-b4350",
+          "deps": {
+            "rates.pricer": {
+              "version": "2.6.1-RC1",
+              "imageVersion": "rc-2026.05.10-b3050"
+            },
+            "data.analytics": {
+              "version": "1.11.1-RC1",
+              "imageVersion": "rc-2026.05.10-b2010"
+            }
+          },
+          "prs": [
+            {
+              "number": 1860,
+              "title": "Backport: fix race in bulk export resumption",
+              "author": "diego-h",
+              "url": "https://github.com/example-org/core-datapedia/pull/1860"
+            },
+            {
+              "number": 1857,
+              "title": "Lift connection pool ceiling for analytics tier",
+              "author": "asha-patel",
+              "url": "https://github.com/example-org/core-datapedia/pull/1857"
+            }
+          ],
+          "testsPassed": 348,
+          "testsTotal": 400
+        },
+        "candidate-next": {
+          "version": "3.4.0-RC1",
+          "imageVersion": "rc-2026.05.21-b4515",
+          "deps": {
+            "rates.pricer": {
+              "version": "2.7.0-RC1",
+              "imageVersion": "rc-2026.05.21-b3145"
+            },
+            "data.analytics": {
+              "version": "1.12.0-RC1",
+              "imageVersion": "rc-2026.05.21-b2040"
+            }
+          },
+          "prs": [
+            {
+              "number": 1898,
+              "title": "Promote streaming export to RC",
+              "author": "asha-patel",
+              "url": "https://github.com/example-org/core-datapedia/pull/1898"
+            }
+          ],
+          "testsPassed": 294,
+          "testsTotal": 400
+        },
+        "release-previous": {
+          "version": "3.2.4",
+          "imageVersion": "prod-v3.2.4",
+          "deps": {
+            "rates.pricer": {
+              "version": "2.5.2",
+              "imageVersion": "prod-v2.5.2"
+            },
+            "data.analytics": {
+              "version": "1.10.4",
+              "imageVersion": "prod-v1.10.4"
+            }
+          },
+          "prs": [
+            {
+              "number": 1701,
+              "title": "Security: tighten CORS allowlist on admin API",
+              "author": "diego-h",
+              "url": "https://github.com/example-org/core-datapedia/pull/1701"
+            }
+          ],
+          "testsPassed": 398,
+          "testsTotal": 400
+        },
+        "release-current": {
+          "version": "3.3.0",
+          "imageVersion": "prod-v3.3.0",
+          "deps": {
+            "rates.pricer": {
+              "version": "2.6.0",
+              "imageVersion": "prod-v2.6.0"
+            },
+            "data.analytics": {
+              "version": "1.11.0",
+              "imageVersion": "prod-v1.11.0"
+            }
+          },
+          "prs": [
+            {
+              "number": 1820,
+              "title": "Release 3.3.0: top-K search + streaming bulk export",
+              "author": "asha-patel",
+              "url": "https://github.com/example-org/core-datapedia/pull/1820"
+            },
+            {
+              "number": 1812,
+              "title": "Stabilize hot path for top-K search",
+              "author": "diego-h",
+              "url": "https://github.com/example-org/core-datapedia/pull/1812"
+            }
+          ],
+          "testsPassed": 392,
+          "testsTotal": 400
+        },
+        "release-next": {
+          "version": "3.3.1",
+          "imageVersion": "prod-v3.3.1-rc",
+          "deps": {
+            "rates.pricer": {
+              "version": "2.6.1",
+              "imageVersion": "prod-v2.6.1-rc"
+            },
+            "data.analytics": {
+              "version": "1.11.1",
+              "imageVersion": "prod-v1.11.1-rc"
+            }
+          },
+          "prs": [
+            {
+              "number": 1862,
+              "title": "3.3.1 patch: bulk-export race + analytics pool",
+              "author": "asha-patel",
+              "url": "https://github.com/example-org/core-datapedia/pull/1862"
+            }
+          ],
+          "testsPassed": 371,
+          "testsTotal": 400
+        }
+      }
+    },
+    {
+      "id": "rates.pricer",
+      "name": "Rates Pricer",
+      "description": "Real-time pricing engine for interest rate products. Consumes reference data from Core Datapedia and emits priced quotes to the trading and analytics tiers.",
+      "leadDevelopers": [
+        {
+          "name": "Mei Tanaka",
+          "email": "mei.tanaka@example.com"
+        }
+      ],
+      "githubRepo": "https://github.com/example-org/rates-pricer",
+      "imageTag": "pricer",
+      "artifacts": [
+        {
+          "name": "rates-pricer-engine",
+          "url": "https://artifactory.example.com/rates-pricer-engine"
+        },
+        {
+          "name": "rates-pricer-sdk",
+          "url": "https://artifactory.example.com/rates-pricer-sdk"
+        }
+      ],
+      "dependencies": [
+        "data.analytics"
+      ],
+      "stages": {
+        "snapshot-previous": {
+          "version": "2.7.0-SNAPSHOT",
+          "imageVersion": "dev-2026.05.18-b3120",
+          "deps": {
+            "data.analytics": {
+              "version": "1.12.0-SNAPSHOT",
+              "imageVersion": "dev-2026.05.18-b2014"
+            }
+          },
+          "prs": [
+            {
+              "number": 942,
+              "title": "Add convexity adjustment to swap leg pricing",
+              "author": "mei-tanaka",
+              "url": "https://github.com/example-org/rates-pricer/pull/942"
+            }
+          ],
+          "testsPassed": 168,
+          "testsTotal": 250
+        },
+        "snapshot-current": {
+          "version": "2.7.1-SNAPSHOT",
+          "imageVersion": "dev-2026.05.20-b3140",
+          "deps": {
+            "data.analytics": {
+              "version": "1.12.1-SNAPSHOT",
+              "imageVersion": "dev-2026.05.20-b2030"
+            }
+          },
+          "prs": [
+            {
+              "number": 951,
+              "title": "Fix off-by-one in OIS discount factor lookup",
+              "author": "mei-tanaka",
+              "url": "https://github.com/example-org/rates-pricer/pull/951"
+            },
+            {
+              "number": 948,
+              "title": "Vectorize curve bootstrapping loop",
+              "author": "mei-tanaka",
+              "url": "https://github.com/example-org/rates-pricer/pull/948"
+            }
+          ],
+          "testsPassed": 195,
+          "testsTotal": 250
+        },
+        "snapshot-next": {
+          "version": "2.7.2-SNAPSHOT",
+          "imageVersion": "dev-2026.05.21-b3147",
+          "deps": {
+            "data.analytics": {
+              "version": "1.12.2-SNAPSHOT",
+              "imageVersion": "dev-2026.05.21-b2041"
+            }
+          },
+          "prs": [
+            {
+              "number": 957,
+              "title": "Experimental: GPU-accelerated PV pipeline",
+              "author": "mei-tanaka",
+              "url": "https://github.com/example-org/rates-pricer/pull/957"
+            }
+          ],
+          "testsPassed": 94,
+          "testsTotal": 250
+        },
+        "candidate-previous": {
+          "version": "2.5.0-RC4",
+          "imageVersion": "rc-2026.03.20-b2820",
+          "deps": {
+            "data.analytics": {
+              "version": "1.10.0-RC2",
+              "imageVersion": "rc-2026.03.20-b1880"
+            }
+          },
+          "prs": [
+            {
+              "number": 880,
+              "title": "Hardening: input validation on quote feed",
+              "author": "mei-tanaka",
+              "url": "https://github.com/example-org/rates-pricer/pull/880"
+            }
+          ],
+          "testsPassed": 235,
+          "testsTotal": 250
+        },
+        "candidate-current": {
+          "version": "2.6.0-RC3",
+          "imageVersion": "rc-2026.04.30-b2980",
+          "deps": {
+            "data.analytics": {
+              "version": "1.11.0-RC1",
+              "imageVersion": "rc-2026.04.30-b1980"
+            }
+          },
+          "prs": [
+            {
+              "number": 920,
+              "title": "RC: SOFR-fallback handling for legacy LIBOR books",
+              "author": "mei-tanaka",
+              "url": "https://github.com/example-org/rates-pricer/pull/920"
+            }
+          ],
+          "testsPassed": 218,
+          "testsTotal": 250
+        },
+        "candidate-next": {
+          "version": "2.7.0-RC1",
+          "imageVersion": "rc-2026.05.21-b3145",
+          "deps": {
+            "data.analytics": {
+              "version": "1.12.0-RC1",
+              "imageVersion": "rc-2026.05.21-b2040"
+            }
+          },
+          "prs": [
+            {
+              "number": 953,
+              "title": "RC1: convexity + vectorized bootstrap",
+              "author": "mei-tanaka",
+              "url": "https://github.com/example-org/rates-pricer/pull/953"
+            }
+          ],
+          "testsPassed": 184,
+          "testsTotal": 250
+        },
+        "release-previous": {
+          "version": "2.5.1",
+          "imageVersion": "prod-v2.5.1",
+          "deps": {
+            "data.analytics": {
+              "version": "1.10.3",
+              "imageVersion": "prod-v1.10.3"
+            }
+          },
+          "prs": [
+            {
+              "number": 805,
+              "title": "2.5.1: hotfix for swap curve interpolation",
+              "author": "mei-tanaka",
+              "url": "https://github.com/example-org/rates-pricer/pull/805"
+            }
+          ],
+          "testsPassed": 248,
+          "testsTotal": 250
+        },
+        "release-current": {
+          "version": "2.6.0",
+          "imageVersion": "prod-v2.6.0",
+          "deps": {
+            "data.analytics": {
+              "version": "1.11.0",
+              "imageVersion": "prod-v1.11.0"
+            }
+          },
+          "prs": [
+            {
+              "number": 925,
+              "title": "Release 2.6.0: SOFR fallback + LIBOR retirement",
+              "author": "mei-tanaka",
+              "url": "https://github.com/example-org/rates-pricer/pull/925"
+            }
+          ],
+          "testsPassed": 246,
+          "testsTotal": 250
+        },
+        "release-next": {
+          "version": "2.6.1",
+          "imageVersion": "prod-v2.6.1-rc",
+          "deps": {
+            "data.analytics": {
+              "version": "1.11.1",
+              "imageVersion": "prod-v1.11.1-rc"
+            }
+          },
+          "prs": [
+            {
+              "number": 933,
+              "title": "2.6.1 patch: OIS discount factor edge case",
+              "author": "mei-tanaka",
+              "url": "https://github.com/example-org/rates-pricer/pull/933"
+            }
+          ],
+          "testsPassed": 231,
+          "testsTotal": 250
+        }
+      }
+    },
+    {
+      "id": "data.analytics",
+      "name": "Data Analytics",
+      "description": "Foundational analytics and statistics library. Provides time-series, aggregation, and risk computation primitives shared across reference-data and pricing services.",
+      "leadDevelopers": [
+        {
+          "name": "Nora Eklund",
+          "email": "nora.e@example.com"
+        },
+        {
+          "name": "Ravi Subramanian",
+          "email": "ravi.s@example.com"
+        }
+      ],
+      "githubRepo": "https://github.com/example-org/data-analytics",
+      "imageTag": "analytics",
+      "artifacts": [
+        {
+          "name": "data-analytics-core",
+          "url": "https://artifactory.example.com/data-analytics-core"
+        }
+      ],
+      "dependencies": [],
+      "stages": {
+        "snapshot-previous": {
+          "version": "1.12.0-SNAPSHOT",
+          "imageVersion": "dev-2026.05.18-b2014",
+          "deps": {},
+          "prs": [
+            {
+              "number": 612,
+              "title": "Add Welford online variance accumulator",
+              "author": "nora-e",
+              "url": "https://github.com/example-org/data-analytics/pull/612"
+            }
+          ],
+          "testsPassed": 115,
+          "testsTotal": 180
+        },
+        "snapshot-current": {
+          "version": "1.12.1-SNAPSHOT",
+          "imageVersion": "dev-2026.05.20-b2030",
+          "deps": {},
+          "prs": [
+            {
+              "number": 624,
+              "title": "Fix NaN propagation in rolling quantile",
+              "author": "ravi-s",
+              "url": "https://github.com/example-org/data-analytics/pull/624"
+            },
+            {
+              "number": 620,
+              "title": "Add CUSUM change-point detector",
+              "author": "nora-e",
+              "url": "https://github.com/example-org/data-analytics/pull/620"
+            }
+          ],
+          "testsPassed": 134,
+          "testsTotal": 180
+        },
+        "snapshot-next": {
+          "version": "1.12.2-SNAPSHOT",
+          "imageVersion": "dev-2026.05.21-b2041",
+          "deps": {},
+          "prs": [
+            {
+              "number": 631,
+              "title": "WIP: parallel time-series resample",
+              "author": "nora-e",
+              "url": "https://github.com/example-org/data-analytics/pull/631"
+            },
+            {
+              "number": 629,
+              "title": "Reduce allocs in EWMA hot path",
+              "author": "ravi-s",
+              "url": "https://github.com/example-org/data-analytics/pull/629"
+            }
+          ],
+          "testsPassed": 61,
+          "testsTotal": 180
+        },
+        "candidate-previous": {
+          "version": "1.10.0-RC2",
+          "imageVersion": "rc-2026.03.20-b1880",
+          "deps": {},
+          "prs": [
+            {
+              "number": 540,
+              "title": "RC2: stabilize bootstrap confidence intervals",
+              "author": "nora-e",
+              "url": "https://github.com/example-org/data-analytics/pull/540"
+            }
+          ],
+          "testsPassed": 168,
+          "testsTotal": 180
+        },
+        "candidate-current": {
+          "version": "1.11.0-RC1",
+          "imageVersion": "rc-2026.04.30-b1980",
+          "deps": {},
+          "prs": [
+            {
+              "number": 595,
+              "title": "RC1: VaR/ES with Cornish-Fisher expansion",
+              "author": "ravi-s",
+              "url": "https://github.com/example-org/data-analytics/pull/595"
+            }
+          ],
+          "testsPassed": 151,
+          "testsTotal": 180
+        },
+        "candidate-next": {
+          "version": "1.12.0-RC1",
+          "imageVersion": "rc-2026.05.21-b2040",
+          "deps": {},
+          "prs": [
+            {
+              "number": 627,
+              "title": "RC1: CUSUM + Welford from snapshot trunk",
+              "author": "nora-e",
+              "url": "https://github.com/example-org/data-analytics/pull/627"
+            }
+          ],
+          "testsPassed": 128,
+          "testsTotal": 180
+        },
+        "release-previous": {
+          "version": "1.10.3",
+          "imageVersion": "prod-v1.10.3",
+          "deps": {},
+          "prs": [
+            {
+              "number": 558,
+              "title": "1.10.3: precision fix in rolling stddev",
+              "author": "ravi-s",
+              "url": "https://github.com/example-org/data-analytics/pull/558"
+            }
+          ],
+          "testsPassed": 178,
+          "testsTotal": 180
+        },
+        "release-current": {
+          "version": "1.11.0",
+          "imageVersion": "prod-v1.11.0",
+          "deps": {},
+          "prs": [
+            {
+              "number": 600,
+              "title": "Release 1.11.0: VaR/ES + risk primitives",
+              "author": "ravi-s",
+              "url": "https://github.com/example-org/data-analytics/pull/600"
+            }
+          ],
+          "testsPassed": 175,
+          "testsTotal": 180
+        },
+        "release-next": {
+          "version": "1.11.1",
+          "imageVersion": "prod-v1.11.1-rc",
+          "deps": {},
+          "prs": [
+            {
+              "number": 608,
+              "title": "1.11.1 patch: NaN propagation in rolling quantile",
+              "author": "ravi-s",
+              "url": "https://github.com/example-org/data-analytics/pull/608"
+            }
+          ],
+          "testsPassed": 162,
+          "testsTotal": 180
+        }
+      }
+    }
+  ]
+}
