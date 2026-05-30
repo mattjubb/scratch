@@ -1,0 +1,5 @@
+group: fx
+project: options
+scheduler: true
+schedule: "0 0 * * *"
+lookaheadDays: 2

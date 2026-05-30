@@ -1,0 +1,5 @@
+group: rates
+project: swaps
+scheduler: true
+schedule: "0 0 * * *"
+lookaheadDays: 2

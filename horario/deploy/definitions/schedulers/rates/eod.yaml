@@ -1,0 +1,3 @@
+group: rates
+project: eod
+lookaheadDays: 2

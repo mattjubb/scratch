@@ -1,0 +1,20 @@
+group: rates
+project: swaps
+mainClass: com.example.rates.PricerApp
+version: dev          # resolved via ImageVersionAPI: rates/swaps/dev
+replicas: 1           # reduced for CRC dev (prod: 2-4)
+resources:
+  cpu: "100m"         # CRC dev sizing (prod: 1)
+  memory: 256Mi       # CRC dev sizing (prod: 2Gi)
+env:
+  - { name: PRICER_MODE,       value: live }
+  - { name: CURVE_SOURCE,      value: vasara-curve-builder }
+  - { name: TRADE_FILTER,      value: "" }           # empty = all trades
+  - { name: SERVER_PORT,       value: "8080" }
+  - { name: MANAGEMENT_PORT,   value: "8081" }
+ports:
+  - { name: rest,    port: 8080 }
+  - { name: mgmt,   port: 8081 }
+args:
+  - "--spring.profiles.active=ocp"
+  - "--server.port=8080"

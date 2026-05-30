@@ -1,0 +1,12 @@
+group: rates
+project: eod
+mainClass: com.example.rates.MarketDataSnapJob
+version: dev
+schedule: "30 16 * * 1-5"    # weekdays at 16:30 UTC (London close)
+defaults:
+  args:
+    snap_time: "16:00:00"
+    instruments: "SOFR,SONIA,ESTR,TONAR"
+    quote_source: bloomberg
+    output_path: /data/market-data
+    dry_run: "false"

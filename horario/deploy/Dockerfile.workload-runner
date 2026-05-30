@@ -1,0 +1,8 @@
+# Tiny base image used by every Vasara workload pod's MAIN container.
+# Init containers extract BOOT-INF/ contents into the shared /ext emptyDir;
+# this image then runs `java -cp '/ext/classes:/ext/lib/*' MAIN_CLASS ARGS`.
+FROM eclipse-temurin:21-jre
+
+RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /ext

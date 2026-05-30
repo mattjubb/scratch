@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vasara-controlplane
+  namespace: vasara
+  labels:
+    vasara.compute/kind: controlplane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vasara-controlplane
+  template:
+    metadata:
+      labels:
+        app: vasara-controlplane
+        vasara.compute/kind: controlplane
+    spec:
+      serviceAccountName: vasara-controlplane
+      containers:
+        - name: app
+          image: registry.local/compute/controlplane:1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: HTTP_PORT
+              value: "8080"
+            - name: TEMPORAL_SYSTEM_NAMESPACE
+              value: vasara-system
+            - name: TEMPORAL_TARGET
+              value: temporal-frontend.temporal.svc.cluster.local:7233
+            - name: COMPUTE_DEFINITIONS_DIR
+              value: /app/definitions
+            - name: COMPUTE_OCP_NAMESPACE
+              value: vasara
+            - name: IMAGE_VERSION_API_URL
+              value: http://image-version-api.vasara.svc.cluster.local
+          readinessProbe:
+            httpGet: { path: /api/lanes, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "500m", memory: "1Gi" }
+            limits:   { cpu: "1",    memory: "2Gi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vasara-controlplane
+  namespace: vasara
+spec:
+  selector:
+    app: vasara-controlplane
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

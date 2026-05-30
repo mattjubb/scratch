@@ -1,0 +1,15 @@
+group: rates
+project: eod
+mainClass: com.example.rates.CurveBuildJob
+version: dev
+schedule: "0 17 * * 1-5"     # weekdays at 17:00 UTC (after market data snapped at 16:30)
+deps:
+  - /rates/eod/market-data    # must complete before this runs
+defaults:
+  args:
+    curve_set: all
+    valuation_ccy: USD
+    interpolation: monotone_convex
+    bootstrap_method: ois
+    include_cross_currency: "true"
+    dry_run: "false"

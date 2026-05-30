@@ -1,0 +1,37 @@
+[versions]
+temporal = "1.27.1"
+fabric8 = "6.13.4"
+vertx = "4.5.11"
+snakeyaml = "2.3"
+jackson = "2.18.2"
+slf4j = "2.0.16"
+logback = "1.5.12"
+junit = "5.11.4"
+mockito = "5.14.2"
+assertj = "3.26.3"
+
+[libraries]
+temporal-sdk = { module = "io.temporal:temporal-sdk", version.ref = "temporal" }
+temporal-testing = { module = "io.temporal:temporal-testing", version.ref = "temporal" }
+
+fabric8-kubernetes = { module = "io.fabric8:kubernetes-client", version.ref = "fabric8" }
+fabric8-openshift = { module = "io.fabric8:openshift-client", version.ref = "fabric8" }
+fabric8-mockserver = { module = "io.fabric8:kubernetes-server-mock", version.ref = "fabric8" }
+
+vertx-core = { module = "io.vertx:vertx-core", version.ref = "vertx" }
+vertx-web = { module = "io.vertx:vertx-web", version.ref = "vertx" }
+vertx-web-client = { module = "io.vertx:vertx-web-client", version.ref = "vertx" }
+
+snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
+
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+jackson-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "jackson" }
+
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+mockito-junit = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }

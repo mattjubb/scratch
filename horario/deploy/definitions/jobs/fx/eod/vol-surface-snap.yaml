@@ -1,0 +1,13 @@
+group: fx
+project: eod
+mainClass: com.example.fx.VolSurfaceSnapJob
+version: dev
+schedule: "0 18 * * 1-5"     # weekdays at 18:00 UTC (market close)
+defaults:
+  args:
+    ccy_pairs: "EURUSD,GBPUSD,USDJPY,USDCHF,AUDUSD,NZDUSD"
+    snap_time: "17:00:00"     # NY close
+    source: live
+    smile_model: SABR
+    output_format: parquet
+    dry_run: "false"

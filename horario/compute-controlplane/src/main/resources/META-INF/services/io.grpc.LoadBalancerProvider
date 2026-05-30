@@ -1,0 +1,4 @@
+io.grpc.internal.PickFirstLoadBalancerProvider
+io.grpc.util.SecretRoundRobinLoadBalancerProvider$Provider
+io.grpc.util.OutlierDetectionLoadBalancerProvider
+io.grpc.protobuf.services.internal.HealthCheckingRoundRobinLoadBalancerProvider

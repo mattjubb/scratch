@@ -1,0 +1,19 @@
+group: fx
+project: options
+mainClass: com.example.fx.VolSurfaceBuilderApp
+version: dev
+replicas: 1           # reduced for CRC dev (prod: 2-4)
+resources:
+  cpu: "100m"         # CRC dev sizing (prod: 2)
+  memory: 256Mi       # CRC dev sizing (prod: 4Gi)
+env:
+  - { name: MARKET_FEED_URL,   value: "http://market-feed.vasara.svc.cluster.local" }
+  - { name: CCY_PAIRS,         value: "EURUSD,GBPUSD,USDJPY,USDCHF,AUDUSD" }
+  - { name: SMILE_MODEL,       value: SABR }
+  - { name: REBUILD_INTERVAL,  value: "60" }          # seconds between intraday rebuilds
+  - { name: SERVER_PORT,       value: "8080" }
+ports:
+  - { name: rest, port: 8080 }
+args:
+  - "--spring.profiles.active=ocp"
+  - "--logging.level.com.example=INFO"

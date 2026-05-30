@@ -23,7 +23,7 @@ public class MapReduceStarter {
     static final int NUM_BATCHES = TOTAL_TASKS / BATCH_SIZE;
 
     public static void main(String[] args) throws InterruptedException {
-        WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
+        WorkflowServiceStubs service = WorkflowServiceStubs.
         WorkflowClient client = WorkflowClient.newInstance(service);
 
         String workflowId = "map-reduce-" + UUID.randomUUID();

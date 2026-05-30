@@ -1,0 +1,13 @@
+group: core
+project: entitlements
+mainClass: com.example.core.LdapSyncJob
+version: dev
+schedule: "0 6 * * 1-5"      # weekdays at 06:00 UTC (before trading opens)
+defaults:
+  args:
+    scope: full               # full | delta
+    target_ou: "ou=trading,dc=corp,dc=local"
+    dry_run: "false"
+    notify_on_change: "true"
+    parallelism: "4"
+    reconcile_roles: "true"
