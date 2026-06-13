@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trade Dashboard</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@34/dist/ag-grid-community.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="app-title">Trade Dashboard</h1>
+
+    <div class="field">
+      <span class="field-label">Desk / Book</span>
+      <button id="scope-button" class="scope-btn" type="button" aria-haspopup="true">Select books…</button>
+    </div>
+
+    <div class="field">
+      <span class="field-label">Mode</span>
+      <div class="segmented" role="group" aria-label="Data mode">
+        <button id="mode-close" class="seg-btn active" type="button">Close</button>
+        <button id="mode-live" class="seg-btn" type="button">Live</button>
+      </div>
+    </div>
+
+    <label class="field" id="date-field">
+      <span class="field-label">As-of (UTC)</span>
+      <input id="asof-date" type="datetime-local" required />
+    </label>
+
+    <div class="field live-status hidden" id="live-status">
+      <span class="field-label">Stream</span>
+      <span class="status"><span class="status-dot" id="status-dot"></span><span id="status-text">connecting…</span></span>
+    </div>
+
+    <div class="topbar-actions">
+      <button id="create-instrument-btn" class="ghost-btn" type="button">+ Create instrument</button>
+      <button id="book-event-btn" class="primary-btn" type="button">+ Book trade event</button>
+      <button id="theme-toggle" class="icon-btn" type="button" title="Toggle light/dark mode" aria-label="Toggle light/dark mode">🌙</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="trades" role="tab" aria-selected="true">Trades</button>
+    <button class="tab" data-tab="events" role="tab" aria-selected="false">Trade Events</button>
+    <button class="tab" data-tab="positions" role="tab" aria-selected="false">Positions</button>
+  </nav>
+
+  <main class="content">
+    <div id="filter-bar" class="filter-bar hidden">
+      <span class="filter-icon" aria-hidden="true">⛃</span>
+      <span id="filter-text" class="filter-text"></span>
+      <button id="filter-clear" class="filter-clear" type="button">Clear filter ✕</button>
+    </div>
+    <div class="grid-stack">
+      <div id="panel-trades" class="grid-panel" role="tabpanel"></div>
+      <div id="panel-events" class="grid-panel hidden" role="tabpanel"></div>
+      <div id="panel-positions" class="grid-panel hidden" role="tabpanel"></div>
+    </div>
+  </main>
+
+  <div id="trade-context-menu" class="context-menu" hidden role="menu">
+    <button class="context-item" data-action="events" type="button" role="menuitem">Show Trade Events</button>
+    <button class="context-item" data-action="positions" type="button" role="menuitem">Show Positions</button>
+  </div>
+
+  <section id="wirelog" class="wirelog collapsed">
+    <div class="wirelog-bar" id="wirelog-bar">
+      <button id="wirelog-toggle" class="wirelog-toggle" type="button" aria-expanded="false">
+        <span class="wirelog-caret">▸</span> Backend messages
+      </button>
+      <span class="wirelog-stats" id="wirelog-stats">0 messages</span>
+      <span class="wirelog-spacer"></span>
+      <button id="wirelog-clear" class="ghost-btn" type="button">Clear</button>
+    </div>
+    <div class="wirelog-body">
+      <div class="wirelog-list-wrap">
+        <div class="wirelog-list-head">
+          <span class="col-time">Time</span>
+          <span class="col-dir">Dir</span>
+          <span class="col-label">Message</span>
+          <span class="col-status">Status</span>
+          <span class="col-size">Size</span>
+          <span class="col-ms">Took</span>
+        </div>
+        <div id="wirelog-list" class="wirelog-list"></div>
+      </div>
+      <div id="wirelog-detail" class="wirelog-detail">
+        <div class="wirelog-empty">Select a message to inspect its payload.</div>
+      </div>
+    </div>
+  </section>
+
+  <div id="scope-scrim" class="drawer-overlay" hidden></div>
+  <aside id="scope-menu" class="scope-menu" aria-hidden="true">
+    <div class="drawer-header">
+      <div class="drawer-title">Desks &amp; books</div>
+      <button id="scope-cancel" class="icon-btn" type="button" aria-label="Close menu">✕</button>
+    </div>
+    <div id="scope-tree" class="scope-tree"></div>
+    <div class="scope-footer">
+      <span class="scope-count" id="scope-count"></span>
+      <button id="scope-confirm" class="primary-btn" type="button">Confirm</button>
+    </div>
+  </aside>
+
+  <div id="drawer-overlay" class="drawer-overlay" hidden></div>
+  <aside id="drawer" class="drawer" aria-hidden="true">
+    <div id="drawer-resizer" class="drawer-resizer" role="separator" aria-orientation="vertical" aria-label="Resize drawer"></div>
+    <div class="drawer-header">
+      <div>
+        <div class="drawer-title">Details</div>
+        <div class="drawer-subtitle" id="drawer-ref"></div>
+      </div>
+      <button id="drawer-close" class="icon-btn" type="button" aria-label="Close drawer">✕</button>
+    </div>
+    <div class="drawer-section">
+      <div class="drawer-section-title">Position transfers</div>
+      <div id="panel-transfers" class="drawer-grid"></div>
+    </div>
+    <div class="drawer-section">
+      <div class="drawer-section-title">Supplemental data</div>
+      <div id="panel-supplemental" class="drawer-grid"></div>
+    </div>
+  </aside>
+
+  <dialog id="book-dialog" class="dialog">
+    <form id="book-form" class="dialog-form">
+      <div class="dialog-header">
+        <h2 class="dialog-title">Book trade event</h2>
+        <button id="book-close" class="icon-btn" type="button" aria-label="Close dialog">✕</button>
+      </div>
+      <div class="dialog-body">
+        <label class="form-field">
+          <span>Event type</span>
+          <select id="evt-type" name="eventType">
+            <option value="NEW">NEW</option>
+            <option value="AMEND">AMEND</option>
+            <option value="CANCEL">CANCEL</option>
+          </select>
+        </label>
+        <label class="form-field" id="field-book">
+          <span>Book</span>
+          <select id="evt-book" name="bookId"></select>
+        </label>
+        <label class="form-field" id="field-traderef" hidden>
+          <span>Trade reference</span>
+          <input id="evt-traderef" name="tradeRef" placeholder="TRD-1234" autocomplete="off" />
+        </label>
+        <label class="form-field" id="field-instrument">
+          <span>Instrument</span>
+          <input id="evt-instrument" name="instrumentRef" placeholder="EURUSD or INS-7001" autocomplete="off" list="instrument-options" />
+          <datalist id="instrument-options"></datalist>
+        </label>
+        <label class="form-field" id="field-quantity">
+          <span>Quantity</span>
+          <input id="evt-quantity" name="quantity" type="number" min="1" placeholder="100000" />
+        </label>
+        <label class="form-field">
+          <span>User</span>
+          <input id="evt-user" name="user" placeholder="your-id" autocomplete="off" />
+        </label>
+        <label class="form-field">
+          <span>As-of (UTC)</span>
+          <input id="evt-asof" name="asOf" type="datetime-local" />
+        </label>
+        <p class="form-error" id="book-error" hidden></p>
+      </div>
+      <div class="dialog-footer">
+        <button id="book-cancel" class="ghost-btn" type="button">Cancel</button>
+        <button id="book-submit" class="primary-btn" type="submit">Book event</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="instrument-dialog" class="dialog dialog-wide">
+    <form id="instrument-form" class="dialog-form">
+      <div class="dialog-header">
+        <h2 class="dialog-title">Create instrument</h2>
+        <button id="instrument-close" class="icon-btn" type="button" aria-label="Close dialog">✕</button>
+      </div>
+      <div class="dialog-body">
+        <label class="form-field">
+          <span>Instrument type</span>
+          <select id="inst-type" name="instrumentType"></select>
+        </label>
+
+        <div class="inst-tabs" role="tablist">
+          <button class="inst-tab active" data-fmt="symbol" type="button" role="tab">Symbol</button>
+          <button class="inst-tab" data-fmt="voice" type="button" role="tab">Voice</button>
+          <button class="inst-tab" data-fmt="fpml" type="button" role="tab">FpML</button>
+          <button class="inst-tab" data-fmt="cdm" type="button" role="tab">CDM</button>
+        </div>
+
+        <div class="inst-panel" data-fmt="symbol">
+          <label class="form-field">
+            <span>Symbol</span>
+            <input id="inst-symbol" placeholder="EURUSD" autocomplete="off" />
+          </label>
+        </div>
+
+        <div class="inst-panel hidden" data-fmt="voice">
+          <div class="form-field">
+            <span>Terms</span>
+            <div id="inst-voice-rows" class="voice-rows"></div>
+            <button id="inst-voice-add" class="ghost-btn voice-add" type="button">+ Add term</button>
+          </div>
+        </div>
+
+        <div class="inst-panel hidden" data-fmt="fpml">
+          <label class="form-field">
+            <span>FpML</span>
+            <textarea id="inst-fpml" class="code-area" rows="10" placeholder="&lt;fpml&gt; … &lt;/fpml&gt;"></textarea>
+          </label>
+        </div>
+
+        <div class="inst-panel hidden" data-fmt="cdm">
+          <label class="form-field">
+            <span>CDM</span>
+            <textarea id="inst-cdm" class="code-area" rows="10" placeholder="{ &quot;tradableProduct&quot;: … }"></textarea>
+          </label>
+        </div>
+
+        <p class="form-error" id="inst-error" hidden></p>
+        <div class="inst-result" id="inst-result" hidden>
+          <span>Instrument reference</span>
+          <code id="inst-result-ref"></code>
+          <button id="inst-use" class="primary-btn" type="button">Use in trade event</button>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button id="instrument-cancel" class="ghost-btn" type="button">Close</button>
+        <button id="instrument-submit" class="primary-btn" type="submit">Create</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
